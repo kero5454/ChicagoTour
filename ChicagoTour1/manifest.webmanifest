@@ -1,0 +1,17 @@
+{
+  "name": "Chicago Tagestour · 11.08.2028",
+  "short_name": "Chicago Tour",
+  "description": "Tagesplan der Chicago-Exkursion mit Karte, Route und allen Programmpunkten.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1220",
+  "theme_color": "#0B1220",
+  "lang": "de",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

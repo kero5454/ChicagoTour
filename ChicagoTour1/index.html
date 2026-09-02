@@ -1,0 +1,1741 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<title>Chicago Tagestour, 30.08.2026</title>
+
+<!-- Inline-Favicon, damit der Browser kein 404 auf /favicon.ico wirft -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231A7088'/%3E%3Cpath d='M16 7c-3.6 0-6.5 2.9-6.5 6.5C9.5 18.6 16 25 16 25s6.5-6.4 6.5-11.5C22.5 9.9 19.6 7 16 7zm0 8.8a2.3 2.3 0 110-4.6 2.3 2.3 0 010 4.6z' fill='white'/%3E%3C/svg%3E">
+
+<!-- Zur Startseite hinzufügen: läuft dann ohne Browser-Leiste -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chicago Tour">
+<meta name="description" content="Tagesplan der Chicago-Exkursion am 30. August 2026, mit Karte, Route und allen Programmpunkten.">
+<link rel="apple-touch-icon" href="icon-180.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+
+<style>
+/* =========================================================================
+   Design Tokens
+   Farben, Typo, Spacing und Radien stammen aus dem Iremia Design System
+   (IremiaColor.kt, IremiaType.kt, IremiaDimens.kt, IremiaShape.kt).
+   Für die Dusk-Karte auf eine dunkle Oberfläche übertragen: Teal500 wird
+   zur Primärfarbe, weil Teal700 auf Dunkel zu wenig Kontrast hätte.
+   ========================================================================= */
+:root{
+  /* Brand */
+  --teal-900:#0F4D5E;
+  --teal-800:#155E72;
+  --teal-700:#1A7088;
+  --teal-600:#1F8299;
+  --teal-500:#2E97AE;   /* PRIMARY auf Dunkel */
+  --teal-300:#6BA3B2;
+  --teal-100:#C7E0E6;
+  --teal-50:#EEF8FA;
+
+  /* Kategorie-Palette */
+  --garden-700:#0F6E56;
+  --garden-500:#2E9576;
+  --bloom:#E5A3B8;
+  --branch:#8A6B4F;
+  --warning:#854F0B;
+  --amber:#E0A458;
+
+  /* Dunkle Oberflächen, abgeleitet aus Ink900 */
+  --bg:#0B1220;
+  --surface:#151C2B;
+  --surface-2:#1B2334;
+  --line:rgba(255,255,255,.10);
+  --line-strong:rgba(255,255,255,.16);
+
+  /* Text auf Dunkel */
+  --text:#F5F7FA;
+  --text-2:#B4BECD;
+  --text-3:#8792A5;
+
+  /* Spacing (4px Basis) */
+  --s1:4px;  --s2:8px;  --s3:12px; --s4:16px; --s5:20px;
+  --s6:24px; --s8:32px; --s10:40px; --s12:48px;
+  --gutter:22px;
+  --card-padding:20px;
+
+  /* Radien, pill-first */
+  --r-card:22px;
+  --r-card-sm:16px;
+  --r-tile:14px;
+  --r-pill:999px;
+  --r-wash:26px;
+
+  /* Motion */
+  --dur-fast:140ms;
+  --dur:240ms;
+  --ease-soft:cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Glas, nach GlassyTabBar, auf Dunkel übersetzt */
+  --glass-fill:rgba(21,28,43,.82);
+  --glass-hairline:rgba(255,255,255,.12);
+  --glass-inner:rgba(255,255,255,.14);
+  --glass-shadow:0 8px 18px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.30);
+
+  --sheet-h:88vh;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+
+html,body{
+  margin:0;padding:0;height:100%;
+  overflow:hidden;
+  background:var(--bg);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Typo-Skala */
+.t-h1{font-size:28px;font-weight:800;line-height:1.12;letter-spacing:-.02em;}
+.t-h2{font-size:22px;font-weight:700;line-height:1.2;}
+.t-card-title{font-size:18px;font-weight:700;line-height:1.25;}
+.t-body{font-size:15px;font-weight:400;line-height:1.5;}
+.t-caption{font-size:13px;font-weight:400;line-height:1.4;}
+.t-eyebrow{font-size:12px;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:.06em;}
+
+/* =========================================================================
+   Karte
+   ========================================================================= */
+#map{position:fixed;inset:0;width:100%;height:100%;}
+.mapboxgl-ctrl-bottom-right{display:none;}
+.mapboxgl-ctrl-bottom-left{bottom:2px;left:2px;}
+.mapboxgl-ctrl-attrib{background:rgba(11,18,32,.6);border-radius:var(--r-pill);}
+.mapboxgl-ctrl-attrib a{color:var(--text-3);}
+.mapboxgl-ctrl-logo{opacity:.5;}
+
+/* Marker */
+.marker{
+  width:34px;height:34px;
+  border-radius:var(--r-pill);
+  border:2px solid rgba(255,255,255,.92);
+  display:grid;place-items:center;
+  font-family:Inter,system-ui,sans-serif;
+  font-size:15px;font-weight:800;line-height:1;
+  color:#fff;cursor:pointer;padding:0;
+  background:var(--teal-500);
+  box-shadow:0 4px 12px rgba(0,0,0,.5);
+  transition:transform var(--dur) var(--ease-soft), box-shadow var(--dur) var(--ease-soft);
+  will-change:transform;
+}
+.marker:active{transform:scale(.97);}
+.marker.is-active{
+  transform:scale(1.2);
+  box-shadow:0 6px 18px rgba(0,0,0,.55), 0 0 0 7px rgba(46,151,174,.28);
+  z-index:2;
+}
+.marker:focus-visible{outline:3px solid var(--teal-500);outline-offset:3px;}
+/* Punkte ohne festen Ort: gestrichelt statt gefüllt */
+.marker.is-virtual{
+  background:var(--surface-2);
+  border-style:dashed;
+  border-color:rgba(255,255,255,.55);
+  color:var(--text-2);
+}
+
+/* Popup */
+.mapboxgl-popup{max-width:290px !important;}
+.mapboxgl-popup-content{
+  padding:0;background:transparent;box-shadow:none;border-radius:var(--r-card-sm);
+}
+.mapboxgl-popup-tip{display:none;}
+.pop{
+  width:270px;
+  border-radius:var(--r-card-sm);
+  overflow:hidden;
+  background:var(--glass-fill);
+  backdrop-filter:blur(24px) saturate(150%);
+  -webkit-backdrop-filter:blur(24px) saturate(150%);
+  border:1px solid var(--glass-hairline);
+  box-shadow:var(--glass-shadow);
+  animation:popIn var(--dur) var(--ease-soft);
+}
+@keyframes popIn{from{opacity:0;transform:translateY(6px) scale(.97);}to{opacity:1;transform:none;}}
+.pop__img{width:100%;height:112px;object-fit:cover;display:block;background:var(--surface-2);}
+.pop__body{padding:var(--s4);}
+.pop__time{color:var(--teal-300);}
+.pop__title{color:var(--text);margin:6px 0 0;font-size:17px;font-weight:700;line-height:1.25;}
+.pop__desc{color:var(--text-2);margin:var(--s2) 0 0;font-size:13px;line-height:1.5;}
+.pop__more{
+  margin:var(--s3) 0 0;padding:var(--s3) 0 0;width:100%;
+  border:none;border-top:1px solid var(--line);background:none;
+  color:var(--teal-300);font-family:inherit;font-size:13px;font-weight:700;
+  text-align:left;cursor:pointer;
+  display:flex;align-items:center;gap:5px;
+}
+.pop__more::after{content:"→";}
+.mapboxgl-popup-close-button{
+  color:var(--text);font-size:22px;padding:2px 9px;right:2px;top:2px;
+  background:rgba(0,0,0,.35);border-radius:var(--r-pill);line-height:1;
+}
+.mapboxgl-popup-close-button:hover{background:rgba(0,0,0,.55);}
+
+/* =========================================================================
+   Intro-Overlay
+   ========================================================================= */
+/* Halbtransparent, damit der Anflug von den USA nach Chicago dahinter
+   sichtbar bleibt. Unten dunkler, damit die Schrift lesbar bleibt. */
+.intro{
+  position:fixed;inset:0;z-index:20;
+  display:grid;place-items:end center;
+  background:linear-gradient(to bottom,
+    rgba(7,12,22,.30) 0%,
+    rgba(7,12,22,.20) 35%,
+    rgba(7,12,22,.78) 78%,
+    rgba(7,12,22,.94) 100%);
+  text-align:center;
+  padding:0 var(--gutter) 13vh;
+  transition:opacity 800ms var(--ease-soft), visibility 800ms;
+}
+.intro.is-gone{opacity:0;visibility:hidden;pointer-events:none;}
+.intro__inner{
+  max-width:340px;
+  animation:introRise 900ms var(--ease-soft) both;
+}
+@keyframes introRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+.intro__eyebrow{color:var(--teal-300);text-shadow:0 1px 6px rgba(0,0,0,.6);}
+.intro__title{
+  color:#fff;margin:var(--s3) 0 var(--s2);
+  font-size:32px;font-weight:800;line-height:1.1;letter-spacing:-.02em;
+  text-shadow:0 2px 16px rgba(0,0,0,.7);
+}
+.intro__sub{color:var(--text-2);font-size:15px;line-height:1.5;margin:0;text-shadow:0 1px 8px rgba(0,0,0,.7);}
+.intro__bar{
+  margin:var(--s6) auto 0;width:180px;height:3px;
+  border-radius:var(--r-pill);background:rgba(255,255,255,.14);overflow:hidden;
+}
+.intro__fill{height:100%;width:0;border-radius:var(--r-pill);background:var(--teal-500);}
+.intro__skip{
+  margin-top:var(--s5);
+  background:none;border:1px solid var(--line-strong);
+  color:var(--text-2);
+  font-family:inherit;font-size:13px;font-weight:600;
+  padding:9px 18px;border-radius:var(--r-pill);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-soft), color var(--dur-fast) var(--ease-soft);
+}
+.intro__skip:hover{background:rgba(255,255,255,.08);color:#fff;}
+.intro__skip:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+
+/* =========================================================================
+   Top-Bar
+   ========================================================================= */
+.top-bar{
+  position:fixed;
+  top:calc(env(safe-area-inset-top, 0px) + var(--s3));
+  left:var(--s3);right:var(--s3);z-index:5;
+  display:flex;align-items:center;gap:var(--s2);
+  padding:9px 9px 9px var(--s5);
+  border-radius:var(--r-pill);
+  background:var(--glass-fill);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid var(--glass-hairline);
+  box-shadow:var(--glass-shadow), inset 0 1px 0 var(--glass-inner);
+  opacity:0;transform:translateY(-10px);
+  transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-soft);
+}
+.top-bar.is-in{opacity:1;transform:none;}
+.top-bar__text{flex:1;min-width:0;}
+.top-bar__eyebrow{color:var(--text-3);}
+.top-bar__title{color:#fff;margin-top:1px;font-size:16px;font-weight:700;line-height:1.2;}
+
+.icon-btn{
+  flex:0 0 auto;width:42px;height:42px;
+  border-radius:var(--r-pill);
+  border:1px solid var(--line-strong);
+  background:rgba(255,255,255,.06);
+  color:var(--teal-300);
+  display:grid;place-items:center;cursor:pointer;
+  transition:transform var(--dur-fast) var(--ease-soft), background var(--dur-fast) var(--ease-soft);
+}
+.icon-btn:active{transform:scale(.97);background:rgba(255,255,255,.12);}
+.icon-btn:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+.icon-btn svg{width:20px;height:20px;display:block;}
+/* Standort-Tracking aktiv */
+.icon-btn.is-active{background:var(--teal-500);color:#fff;border-color:transparent;}
+
+/* Mapbox-Standortpunkt in Brand-Farbe statt Default-Blau */
+.mapboxgl-user-location-dot,
+.mapboxgl-user-location-dot::before{background-color:var(--teal-500);}
+.mapboxgl-user-location-dot::after{border:2px solid #fff;}
+.mapboxgl-user-location-accuracy-circle{background-color:rgba(46,151,174,.22);}
+
+/* Toast */
+.toast{
+  position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 24px);
+  transform:translate(-50%, 16px);
+  z-index:30;max-width:min(420px, calc(100vw - 44px));
+  padding:13px var(--s5);
+  border-radius:var(--r-pill);
+  background:var(--glass-fill);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid var(--glass-hairline);
+  box-shadow:var(--glass-shadow);
+  color:var(--text);font-size:14px;line-height:1.4;text-align:center;
+  opacity:0;pointer-events:none;
+  transition:opacity var(--dur) var(--ease-soft), transform var(--dur) var(--ease-soft);
+}
+.toast.is-in{opacity:1;transform:translate(-50%, 0);}
+
+/* =========================================================================
+   Tour-Navigation
+   Feste Leiste direkt unter der Top-Bar: Zurück/Weiter zwischen den
+   Programmpunkten. Immer an derselben Stelle, kollidiert nie mit Popups
+   oder Karten, ersetzt den früheren schwebenden FAB.
+   ========================================================================= */
+.tour-nav{
+  position:fixed;
+  top:calc(env(safe-area-inset-top, 0px) + var(--s3) + 60px + var(--s3));
+  left:calc(var(--s3) + 14px);right:calc(var(--s3) + 14px);z-index:5;
+  display:flex;align-items:center;gap:6px;
+  padding:5px;
+  border-radius:var(--r-pill);
+  background:var(--glass-fill);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  border:1px solid var(--glass-hairline);
+  box-shadow:var(--glass-shadow), inset 0 1px 0 var(--glass-inner);
+  opacity:0;transform:translateY(-8px);
+  transition:opacity 500ms var(--ease-soft), transform 500ms var(--ease-soft);
+}
+.tour-nav.is-in{opacity:1;transform:none;}
+.tour-nav__label{
+  flex:1 1 auto;min-width:0;text-align:center;
+  color:var(--text-2);font-size:13px;font-weight:700;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:0 var(--s2);
+}
+.tour-nav__btn{
+  flex:0 0 auto;width:32px;height:32px;
+  border-radius:var(--r-pill);border:none;
+  background:rgba(255,255,255,.08);color:var(--text-2);
+  display:grid;place-items:center;cursor:pointer;
+  transition:transform var(--dur-fast) var(--ease-soft),
+             background var(--dur-fast) var(--ease-soft),
+             opacity var(--dur-fast) var(--ease-soft);
+}
+.tour-nav__btn svg{width:16px;height:16px;display:block;}
+.tour-nav__btn:active{transform:scale(.94);}
+.tour-nav__btn:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+.tour-nav__btn:disabled{opacity:.3;pointer-events:none;}
+.tour-nav__btn--primary{background:var(--teal-500);color:#fff;}
+.tour-nav__btn--primary:active{background:var(--teal-600);}
+
+/* =========================================================================
+   Bottom Sheet
+   ========================================================================= */
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:7;
+  height:var(--sheet-h);
+  display:flex;flex-direction:column;
+  border-radius:var(--r-wash) var(--r-wash) 0 0;
+  background:var(--glass-fill);
+  backdrop-filter:blur(24px) saturate(150%);
+  -webkit-backdrop-filter:blur(24px) saturate(150%);
+  border-top:1px solid var(--glass-hairline);
+  box-shadow:var(--glass-shadow), inset 0 1px 0 var(--glass-inner);
+  touch-action:none;will-change:transform;
+}
+.sheet.is-animating{transition:transform var(--dur) var(--ease-soft);}
+/* Während des Intros liegt das Sheet unter dem Bildrand */
+.sheet.is-waiting{transform:translateY(100%) !important;}
+.sheet.is-entering{transition:transform 620ms var(--ease-soft);}
+
+.sheet__grabber{
+  flex:0 0 auto;padding:10px 0 var(--s2);
+  display:grid;place-items:center;cursor:grab;
+  transition:padding var(--dur) var(--ease-soft);
+}
+.sheet__grabber::before{
+  content:"";width:40px;height:5px;
+  border-radius:var(--r-pill);background:rgba(255,255,255,.28);
+  transition:background var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast) var(--ease-soft);
+}
+/* Ganz zugeklappt: größere Antipp-Fläche und deutlicherer Griff,
+   damit klar bleibt, wie man die Liste zurückholt. */
+.sheet.is-closed .sheet__grabber{padding:14px 0 var(--s3);}
+.sheet.is-closed .sheet__grabber::before{
+  width:44px;height:6px;background:rgba(255,255,255,.42);
+}
+.sheet__grabber:active{cursor:grabbing;}
+.sheet__grabber:focus{outline:none;}
+.sheet__grabber:focus-visible{outline:none;}
+.sheet__grabber:focus-visible::before{
+  background:var(--teal-500);
+  box-shadow:0 0 0 4px rgba(46,151,174,.3);
+}
+
+.sheet__header{
+  flex:0 0 auto;
+  padding:var(--s1) var(--gutter) var(--s4);
+  cursor:grab;position:relative;z-index:1;
+}
+.sheet__header:active{cursor:grabbing;}
+.sheet__eyebrow{color:var(--text-3);}
+.sheet__title{color:#fff;margin:var(--s2) 0 0;}
+.sheet__meta{color:var(--text-3);margin-top:6px;font-size:13px;}
+
+/* Liste. position:relative macht sie zum offsetParent der Cards. */
+.stops{
+  position:relative;flex:1 1 auto;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;touch-action:pan-y;
+  padding:0 var(--gutter) calc(182px + env(safe-area-inset-bottom, 0px));
+  display:flex;flex-direction:column;gap:var(--s3);
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent;
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 18px);
+  mask-image:linear-gradient(to bottom, transparent 0, #000 18px);
+}
+.stops::-webkit-scrollbar{width:6px;}
+.stops::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:var(--r-pill);}
+.stops::-webkit-scrollbar-track{background:transparent;}
+
+/* Station-Card */
+.stop{
+  display:flex;align-items:flex-start;gap:var(--s4);
+  width:100%;padding:var(--card-padding);
+  border-radius:var(--r-card);
+  border:1px solid var(--line);
+  background:var(--surface);
+  font-family:inherit;text-align:left;cursor:pointer;
+  box-shadow:0 6px 14px rgba(0,0,0,.28);
+  transition:transform var(--dur-fast) var(--ease-soft),
+             background var(--dur) var(--ease-soft),
+             border-color var(--dur) var(--ease-soft);
+}
+.stop:active{transform:scale(.97);}
+.stop:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+.stop.is-active{background:var(--surface-2);border-color:var(--teal-500);}
+/* Ohne festen Ort: flacher, gestrichelt, klar als Nicht-Station lesbar */
+.stop.is-virtual{
+  background:transparent;
+  border-style:dashed;
+  border-color:var(--line-strong);
+  box-shadow:none;
+}
+.stop.is-virtual.is-active{background:var(--surface);border-color:var(--teal-500);}
+
+.stop__thumb{
+  flex:0 0 auto;width:84px;height:84px;
+  border-radius:var(--r-tile);
+  object-fit:cover;display:block;
+  background:var(--surface-2);
+  border:1px solid var(--line);
+}
+.stop__body{flex:1 1 auto;min-width:0;padding-top:1px;}
+.stop__time{color:var(--teal-300);font-size:12px;font-weight:700;letter-spacing:.04em;}
+.stop__head{display:flex;align-items:flex-start;gap:var(--s2);margin-top:5px;}
+.stop__nr{
+  flex:0 0 auto;width:24px;height:24px;margin-top:1px;
+  border-radius:var(--r-pill);display:grid;place-items:center;
+  font-size:12px;font-weight:800;line-height:1;color:#fff;
+  background:var(--teal-500);
+}
+.stop.is-virtual .stop__nr{
+  background:transparent;color:var(--text-3);
+  border:1px dashed rgba(255,255,255,.4);
+}
+.stop__name{color:var(--text);min-width:0;overflow-wrap:break-word;}
+.stop__desc{color:var(--text-2);margin:var(--s2) 0 0;}
+.stop__meta{color:var(--text-3);margin-top:var(--s3);}
+
+/* =========================================================================
+   Desktop: Sheet wird Sidebar
+   ========================================================================= */
+@media (min-width:900px){
+  .sheet{
+    top:0;bottom:0;left:0;right:auto;
+    width:420px;height:100%;
+    border-radius:0;border-top:none;
+    border-right:1px solid var(--glass-hairline);
+    transform:none !important;touch-action:auto;
+  }
+  .sheet__grabber{display:none;}
+  .sheet__header{padding-top:calc(env(safe-area-inset-top, 0px) + var(--s8));cursor:default;}
+  .stops{touch-action:auto;}
+  .top-bar{left:calc(420px + var(--s6));right:var(--s6);}
+  .tour-nav{left:calc(420px + var(--s6) + 14px);right:calc(var(--s6) + 14px);top:calc(var(--s6) + 60px + var(--s3));}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important;}
+}
+
+/* =========================================================================
+   Detailansicht
+   Vollbild-Overlay über Karte und Liste. Öffnet beim Tippen auf eine Karte
+   oder ein Popup, zeigt den ausführlichen Text in Abschnitten.
+   ========================================================================= */
+.detail{
+  position:fixed;inset:0;z-index:40;
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  transform:translateY(100%);
+  transition:transform 420ms var(--ease-soft);
+  visibility:hidden;
+}
+.detail.is-open{transform:none;visibility:visible;}
+.detail.is-instant{transition:none;}
+@media (min-width:900px){
+  .detail{left:420px;}
+}
+
+.detail__scroll{
+  flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+
+.detail__hero{
+  position:relative;width:100%;
+  aspect-ratio:16/10;max-height:46vh;
+  background:var(--surface-2);
+  overflow:hidden;
+}
+.detail__hero img{width:100%;height:100%;object-fit:cover;display:block;}
+.detail__hero::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(to bottom, rgba(7,12,22,.55) 0%, rgba(7,12,22,0) 22%, rgba(7,12,22,0) 68%, var(--bg) 100%);
+  pointer-events:none;
+}
+
+.detail__topbar{
+  position:fixed;top:0;left:0;right:0;z-index:2;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+  padding:calc(env(safe-area-inset-top, 0px) + var(--s3)) var(--s4) var(--s3);
+  background:transparent;
+  transition:background var(--dur) var(--ease-soft);
+}
+.detail__topbar.is-scrolled{
+  background:linear-gradient(to bottom, var(--bg) 0%, var(--bg) 70%, rgba(11,18,32,0) 100%);
+  padding-bottom:calc(var(--s3) + 26px);
+}
+@media (min-width:900px){ .detail__topbar{left:420px;} }
+
+.detail__back{
+  flex:0 0 auto;height:42px;padding:0 var(--s4) 0 var(--s3);
+  border-radius:var(--r-pill);border:1px solid var(--glass-hairline);
+  background:var(--glass-fill);
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:var(--glass-shadow);
+  color:var(--text);font-family:inherit;font-size:14px;font-weight:700;
+  display:flex;align-items:center;gap:6px;cursor:pointer;
+}
+.detail__back svg{width:18px;height:18px;display:block;}
+.detail__back:active{transform:scale(.97);}
+.detail__back:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+
+.detail__count{
+  flex:0 0 auto;height:42px;padding:0 var(--s4);
+  border-radius:var(--r-pill);border:1px solid var(--glass-hairline);
+  background:var(--glass-fill);
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:var(--glass-shadow);
+  color:var(--text-2);font-size:13px;font-weight:700;
+  display:flex;align-items:center;
+}
+
+.detail__body{
+  padding:var(--s5) var(--gutter) calc(140px + env(safe-area-inset-bottom, 0px));
+  max-width:720px;margin:0 auto;
+}
+.detail__time{color:var(--teal-300);}
+.detail__title{color:#fff;margin:var(--s2) 0 0;font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-.01em;}
+.detail__lead{color:var(--text-2);margin:var(--s3) 0 0;font-size:16px;line-height:1.55;}
+
+.detail__section{margin-top:var(--s8);}
+.detail__section:first-of-type{margin-top:var(--s6);}
+.detail__h{
+  color:var(--teal-300);margin:0 0 var(--s3);
+  font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+  padding-bottom:var(--s2);border-bottom:1px solid var(--line);
+}
+.detail__text{color:var(--text);margin:0;font-size:15.5px;line-height:1.7;white-space:pre-line;}
+.detail__text b, .detail__text strong{color:#fff;font-weight:700;}
+
+.detail__nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:3;
+  padding:var(--s4) var(--gutter) calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+  display:flex;gap:var(--s3);
+  background:linear-gradient(to top, var(--bg) 55%, rgba(11,18,32,0) 100%);
+}
+@media (min-width:900px){ .detail__nav{left:420px;} }
+.detail__nav-btn{
+  flex:1 1 auto;height:54px;
+  border:none;border-radius:var(--r-pill);
+  font-family:inherit;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;
+}
+.detail__nav-btn svg{width:18px;height:18px;display:block;}
+.detail__nav-btn.is-primary{background:var(--teal-500);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.45);}
+.detail__nav-btn.is-primary:active{background:var(--teal-600);transform:scale(.98);}
+.detail__nav-btn.is-ghost{
+  flex:0 0 54px;background:var(--surface);border:1px solid var(--line-strong);color:var(--text);
+}
+.detail__nav-btn.is-ghost:active{background:var(--surface-2);transform:scale(.97);}
+.detail__nav-btn:disabled{opacity:.35;pointer-events:none;}
+.detail__nav-btn:focus-visible{outline:3px solid var(--teal-500);outline-offset:2px;}
+</style>
+</head>
+<body>
+
+<div id="map" aria-label="Karte der Tagestour durch Chicago"></div>
+
+<!-- Intro: Anflug von den USA nach Chicago -->
+<div class="intro" id="intro">
+  <div class="intro__inner">
+    <div class="t-eyebrow intro__eyebrow">Exkursion am 30. August 2026</div>
+    <h1 class="intro__title">Chicago<br>Stadtentwicklung</h1>
+    <p class="intro__sub">Ein Tag durch den Loop, vom Hostel bis zum Fulton Market District.</p>
+    <div class="intro__bar"><div class="intro__fill" id="intro-fill"></div></div>
+    <button class="intro__skip" id="intro-skip" type="button">Direkt zur Karte</button>
+  </div>
+</div>
+
+<header class="top-bar" id="top-bar">
+  <div class="top-bar__text">
+    <div class="t-eyebrow top-bar__eyebrow">Tagesplan vom 30.08.2026</div>
+    <div class="top-bar__title">Chicago Downtown</div>
+  </div>
+  <button class="icon-btn" id="locate" type="button" aria-label="Meinen Standort anzeigen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 3L14.5 21l-3-7.5L4 10.5z"/>
+    </svg>
+  </button>
+  <button class="icon-btn" id="recenter" type="button" aria-label="Gesamte Route anzeigen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>
+    </svg>
+  </button>
+</header>
+
+<nav class="tour-nav" id="tour-nav" aria-label="Zwischen Programmpunkten wechseln">
+  <button class="tour-nav__btn" id="tour-prev" type="button" aria-label="Vorheriger Programmpunkt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+  </button>
+  <div class="tour-nav__label" id="tour-nav-label">Tour starten</div>
+  <button class="tour-nav__btn tour-nav__btn--primary" id="tour-next" type="button" aria-label="Nächster Programmpunkt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
+</nav>
+
+<section class="sheet is-waiting" id="sheet" aria-label="Programmpunkte des Tages">
+  <div class="sheet__grabber" id="grabber" role="button" tabindex="0"
+       aria-label="Liste ziehen, um sie zu öffnen oder zu schließen"></div>
+  <div class="sheet__header" id="sheet-header">
+    <div class="t-eyebrow sheet__eyebrow">Sonntag, 30. August 2026</div>
+    <h1 class="t-h1 sheet__title">Chicago Downtown</h1>
+    <div class="sheet__meta" id="sheet-meta">15 Programmpunkte, 08:00 bis 19:00 Uhr</div>
+  </div>
+  <div class="stops" id="stops"></div>
+</section>
+
+<div class="detail" id="detail" aria-hidden="true" aria-label="Detailansicht des Programmpunkts">
+  <div class="detail__topbar">
+    <button class="detail__back" id="detail-back" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      Zurück
+    </button>
+    <div class="detail__count" id="detail-count"></div>
+  </div>
+  <div class="detail__scroll" id="detail-scroll">
+    <div class="detail__hero"><img id="detail-img" alt=""></div>
+    <div class="detail__body">
+      <div class="t-eyebrow detail__time" id="detail-time"></div>
+      <h1 class="detail__title" id="detail-title"></h1>
+      <p class="detail__lead" id="detail-lead"></p>
+      <div id="detail-sections"></div>
+    </div>
+  </div>
+  <div class="detail__nav">
+    <button class="detail__nav-btn is-ghost" id="detail-prev" type="button" aria-label="Vorheriger Ort">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <button class="detail__nav-btn is-primary" id="detail-next" type="button">
+      <span id="detail-next-label">Nächster Ort</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   Mapbox Access Token
+   Öffentlicher pk-Key. Hier austauschen, falls nötig.
+   Für den öffentlichen Einsatz im Mapbox-Dashboard eine URL-Restriction setzen.
+   ========================================================================= */
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2VybzU0IiwiYSI6ImNtc3FlamxiNzA1MnAyeXF5ZHgxa213MDYifQ.hTfkOcyauJx2sdAHyymt3g';
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DESKTOP = () => window.matchMedia('(min-width: 900px)').matches;
+
+/* =========================================================================
+   Bilder
+   Alle URLs einzeln gegen die Wikimedia-API geprüft (HTTP 200, echtes JPEG).
+   Lizenzen: Public Domain, CC BY 2.0/3.0, CC BY-SA 3.0/4.0.
+   ========================================================================= */
+const IMG = {
+  hostel:     'https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/HI-Chicago_Hostel.JPG/500px-HI-Chicago_Hostel.JPG',
+  millennium: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Chicago_from_under_the_Cloud_Gate_%289694666470%29.jpg/500px-Chicago_from_under_the_Cloud_Gate_%289694666470%29.jpg',
+  randolph:   'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Columbus_Drive_south_from_BP_Bridge_2004-11_stb_2562.jpg/500px-Columbus_Drive_south_from_BP_Bridge_2004-11_stb_2562.jpg',
+  tribune:    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Tribune_Tower.jpg/500px-Tribune_Tower.jpg',
+  wrigley:    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Wrigley_Building.jpg/500px-Wrigley_Building.jpg',
+  cruise:     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Chicago%E2%80%99s_Little_Lady.jpg/500px-Chicago%E2%80%99s_Little_Lady.jpg',
+  cac:        'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Chicago_Architecture_Center.jpg/500px-Chicago_Architecture_Center.jpg',
+  zeropoint:  'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/Madison_and_State_Street_in_Winter%2C_Chicago%2C_Illinois_%282013%29.jpg/500px-Madison_and_State_Street_in_Winter%2C_Chicago%2C_Illinois_%282013%29.jpg',
+  willis:     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/The_Ledge%2C_Willis_Tower_Skydeck%2C_Chicago%2C_Illinois_%2842675297114%29.jpg/500px-The_Ledge%2C_Willis_Tower_Skydeck%2C_Chicago%2C_Illinois_%2842675297114%29.jpg',
+  giordanos:  'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Giordano%27s_Deep_Dish_Pizza.jpg/500px-Giordano%27s_Deep_Dish_Pizza.jpg',
+  rookery:    'https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/The_Rookery_Building_court_%28Chicago%2C_IL%29.jpg/500px-The_Rookery_Building_court_%28Chicago%2C_IL%29.jpg',
+  federal:    'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Flamingo%2C_Federal_Plaza%2C_Kluczynski_Federal_Building%2C_Chicago%2C_Illinois_%289179411899%29.jpg/500px-Flamingo%2C_Federal_Plaza%2C_Kluczynski_Federal_Building%2C_Chicago%2C_Illinois_%289179411899%29.jpg',
+  cbot:       'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Chicago_Board_of_Trade_Building.jpg/500px-Chicago_Board_of_Trade_Building.jpg',
+  daley:      'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fb/Chicago_Picasso_at_Daley_Plaza%2C_July_2011_%286176191387%29.jpg/500px-Chicago_Picasso_at_Daley_Plaza%2C_July_2011_%286176191387%29.jpg',
+  wolfpoint:  'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Wolf_Point_Pano_%286576441689%29.jpg/500px-Wolf_Point_Pano_%286576441689%29.jpg',
+  fulton:     'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Fulton_Market_District_%2851627543540%29.jpg/500px-Fulton_Market_District_%2851627543540%29.jpg'
+};
+
+/* Fallback 1: echter Kartenausschnitt vom Ort, im Dusk-Look.
+   Fallback 2 (falls auch das scheitert): SVG-Verlauf mit Nummer. */
+function staticMap(coords){
+  const [lng, lat] = coords;
+  return `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${lng},${lat},15.6,0/300x300@2x`
+       + `?logo=false&attribution=false&access_token=${MAPBOX_TOKEN}`;
+}
+function svgFallback(stop){
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">` +
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0" stop-color="#1A7088"/><stop offset="1" stop-color="#2E97AE"/>` +
+      `</linearGradient></defs>` +
+      `<rect width="168" height="168" fill="url(#g)"/>` +
+      `<text x="84" y="84" text-anchor="middle" dominant-baseline="central" ` +
+        `font-family="Inter, sans-serif" font-size="72" font-weight="800" ` +
+        `fill="#FFFFFF" fill-opacity="0.22">${stop.nr}</text>` +
+    `</svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+/* Bild mit Fallback-Kette: Foto -> Kartenausschnitt -> SVG */
+function wireImage(el, stop){
+  let stage = 0;
+  el.addEventListener('error', () => {
+    stage++;
+    if (stage === 1 && stop.coords) el.src = staticMap(stop.coords);
+    else el.src = svgFallback(stop);
+  });
+  el.src = stop.img || (stop.coords ? staticMap(stop.coords) : svgFallback(stop));
+}
+
+/* =========================================================================
+   Tagesplan vom 30.08.2026
+   virtual:true = Programmpunkt ohne eigenen festen Ort (Mittagessen, Ausklang).
+   Diese werden auf der Karte und in der Liste gestrichelt dargestellt.
+   ========================================================================= */
+const STOPS = [
+  { nr:1, time:'08:00', name:'HI Chicago Hostel', dur:'Start',
+    coords:[-87.62596, 41.87538], img:IMG.hostel,
+    desc:'Treffpunkt und Start in den Tag. Von hier geht es zu Fuß Richtung Millennium Park.',
+    sections:[
+      { h:'Start in den Tag', t:'Treffpunkt und Ausgangspunkt der Tour. Von hier geht es zu Fuß Richtung Millennium Park, dem Einstieg in die Stadtentwicklungsgeschichte Chicagos.' }
+    ] },
+
+  { nr:2, time:'08:00', name:'Millennium Park', dur:'75 Min',
+    coords:[-87.62310, 41.88264], img:IMG.millennium,
+    desc:'Einstieg in die Stadtentwicklung: von der ersten Besiedlung über den Great Chicago Fire bis zum Burnham Plan von 1909.',
+    sections:[
+      { h:'Erste Besiedlung', t:'1770er Jahre: Jean Baptiste Point du Sable → einer der ersten dauerhaften nicht-indigenen Siedler.\n• Potawatomi als damalige indigene Bevölkerungsgruppe.\n• „Checagou / Checaguar" → Bezeichnung aus der Sprache der Potawatomi. Bedeutung: „wilde Zwiebel" / „Stinktier". Bezug auf sumpfige Landschaft und Geruch der dort wachsenden Pflanzen.\n1779: Handelsposten von du Sable am Nordufer des Lake Michigan → günstige Lage für Handel, Verkehr und regionalen Warenumschlag.' },
+      { h:'Stadtgründung & wirtschaftlicher Aufstieg', t:'12. August 1833: offizielle Gründung als Village (ca. 350 Einwohner).\n1837: Erhalt der Stadtrechte (ca. 4.000 Einwohner). Wirtschaftsboom, Ausbau von Wasserwegen, Hafen und Verkehrsverbindungen.\n1848: Illinois & Michigan Canal → Verbindung Great Lakes ↔ Mississippi-System und Warenverkehr bis zum Golf von Mexiko.\n1848: Anschluss an das Eisenbahnnetz → Chicago wird zentraler Verkehrs- und Handelsknotenpunkt der USA.\nStarkes Bevölkerungswachstum: 1857 über 90.000 Einwohner, starke europäische Einwanderung, insbesondere Iren und Deutsche.' },
+      { h:'Choleraepidemien 1832–1867', t:'Schnelles Bevölkerungswachstum + sumpfiges, niedrig gelegenes Gelände → schlechte Entwässerung und hygienische Bedingungen.\nVerschmutztes Wasser und fehlende Kanalisation → wiederkehrende Choleraepidemien; 1854 ca. 1.500 Todesfälle.\nCholera → politischer und städtebaulicher Handlungsdruck zum Ausbau von Wasser- und Abwasserinfrastruktur.\n1855: Ellis S. Chesbrough entwickelt umfassendes Kanalisations- und Entwässerungssystem. Anhebung von Straßen und Gebäuden → Verbesserung von Gefälle, Entwässerung und hygienischen Bedingungen.\nLangfristige Folge: technische Infrastruktur wird zentraler Bestandteil der Stadtentwicklung Chicagos.' },
+      { h:'Great Chicago Fire & Wiederaufbau', t:'8. Oktober 1871: Beginn des Great Chicago Fire, Branddauer ca. 2 Tage. Überwiegend Holzbebauung → schnelle Ausbreitung. Ca. 18.000 Gebäude zerstört, 100.000 Menschen obdachlos, 300 Todesopfer.\nWiederaufbau als städtebaulicher und architektonischer Wendepunkt: neue Baumaterialien wie Stein, Ziegel, Stahl; zunehmende vertikale Verdichtung; Stahlrahmenkonstruktionen + Aufzüge → Voraussetzungen für den modernen Wolkenkratzer.\nChicago wird Zentrum neuer Hochhaus- und Geschäftshausarchitektur; die World’s Columbian Exposition 1893 macht die Stadt zusätzlich international zum architektonischen Schaufenster.\nEnormes Bevölkerungswachstum: 1880 ca. 500.000, 1890 ca. 1 Mio.' },
+      { h:'1893: World’s Columbian Exposition', t:'Internationales Schaufenster Chicagos. Daniel Burnham als Director of Works; Frederick Law Olmsted gestaltet die Landschaft.\nBedeutender Einfluss auf Architektur und Stadtentwicklung (erstes Riesenrad, bewegter Gehweg).\nBesonders imposant war die Lage und Harmonie der Ausstellungsgebäude, Gartenanlagen und Wasserflächen zusammen → Grundlage für den Burnham Plan.' },
+      { h:'Burnham Plan Grundlagen', t:'1909 Plan of Chicago / Burnham Plan & City Beautiful Movement. Ausgangspunkt: stark wachsendes Chicago → zunehmende Probleme bei Verkehr, Infrastruktur, Bebauung und öffentlichem Raum. Ziel: räumliche, langfristige Organisation des zukünftigen Wachstums, Chicago als gesamtstädtische Perspektive.\n1906: Commercial Club beauftragt Daniel Burnham gemeinsam mit Edward H. Bennett als Co-Autor.\n1909: Veröffentlichung des Plan of Chicago. Grundprinzip: Verbindung von wirtschaftlicher Effizienz, Verkehr, Freiraum und städtebaulicher Gestaltung.\nCity Beautiful Movement: Verbindung von Stadtplanung, Landschaftsarchitektur und repräsentativer Architektur – öffentliche Plätze, Parks und Grünräume, Boulevards, monumentale öffentliche Gebäude, ästhetisch geordnete Stadträume.\nVorbild: World’s Columbian Exposition 1893 / „White City" – Burnham als Director of Works, Beaux-Arts / neoklassizistische Gestaltung.\n6 zentrale Handlungsfelder: Lakefront, Fernstraßen, Eisenbahn, Parksystem, Straßensystem, Civic Center.\nWichtig: Der Plan wurde nicht vollständig umgesetzt, viele Vorschläge blieben Vision. Dennoch: prägender Einfluss auf Verkehrsstruktur, Lakefront, Parksystem und Stadtentwicklung Chicagos.' }
+    ] },
+
+  { nr:3, time:'08:45', name:'Kreuzung Randolph St / Columbus Dr', dur:'15 Min',
+    coords:[-87.62150, 41.88445], img:IMG.randolph,
+    desc:'Einstieg in die Multi-Level City: warum Chicagos Straßen entlang des Flusses mehrgeschossig geführt werden.',
+    sections:[
+      { h:'Multi-Level Street System – Entstehung', t:'Standort: vor allem Downtown / Loop entlang des Chicago River.\nDer Chicago River hat zahlreiche bewegliche Bascule-Brücken. Brücken benötigen Höhenfreiraum für Schiffe → Straßen mussten an den Brücken angehoben werden.\nZusätzlich verliefen Eisenbahngleise entlang des Flusses → weitere Höhen- und Verkehrsprobleme.\nViele dicht aufeinanderfolgende Flussquerungen → mehrgeschossige Straßenführung.\n→ Begrenzter Stadtraum wird vertikal organisiert, statt nur horizontal erweitert.' }
+    ] },
+
+  { nr:4, time:'09:00', name:'Fort Dearborn / DuSable Bridge', dur:'30 Min',
+    coords:[-87.62439, 41.88855], img:IMG.tribune,
+    desc:'Von der militärischen Fortgründung zur gestapelten Stadt: DuSable Bridge, Michigan Avenue und die Magnificent Mile.',
+    sections:[
+      { h:'Fort Dearborn – historische Ausgangslage', t:'1803: Errichtung von Fort Dearborn zur militärischen Sicherung des Handelsstandortes, strategische Lage am Chicago River.\n1812–1815: Zerstörung des Forts im Krieg, „Fort Dearborn Massacre". Konflikt zwischen US-amerikanischen Siedlern/Soldaten gegen die Engländer und die Potawatomi → anschließende Vertreibung der indigenen Bevölkerung, keine neue Besiedelung in dem Gebiet.\nNach dem Krieg: Wiederaufbau des Forts, Ausbau Chicagos zum regionalen Handels- und Umschlagplatz vor allem für Rohstoffe. Steigende Zahl von Siedlern → Entwicklung vom Handelsposten zum Dorf.' },
+      { h:'Multi-Level Street System – historische Entwicklung', t:'1855–1858: Anhebung von Straßen und Gebäuden um ca. 1,2–2,1 m. Ursprüngliches Niveau nahe Lake Michigan, Probleme mit Schlamm, Abwasser und Entwässerung → höhere Straßen ermöglichen funktionierende Kanalisation.\nSpätes 19. Jh.: zunehmender Verkehrs- und Infrastrukturbedarf.\n1910: Chicago Plan Commission → Umsetzung des Burnham- und Bennett-Plans, systematische Anordnung von Straßen und Avenues für bessere Verkehrsverbindungen zum Business District.' },
+      { h:'Michigan Avenue & Wacker Drive', t:'Späte 1910er: erste eigentliche zweigeschossige Straße, die Michigan Avenue – wichtige Umsetzungsidee des Plans, Verbindung über den Chicago River, Ausbau zur repräsentativen Nord-Süd-Achse.\nWacker Drive entlang des Chicago River: Planung im Burnham Plan von 1909, 1926 Fertigstellung des ersten Abschnitts, ersetzt den South Water Street Market, teilweise drei Ebenen.\n• Obere Ebene: lokaler Autoverkehr, Taxis, Fußgänger, Haupteingänge von Hotels, Hochhäusern und Geschäften.\n• Untere Ebene: Durchgangsverkehr und Wirtschaftsverkehr, Umgehung des oberirdischen Verkehrs, Anlieferung und Gebäudeversorgung.\n• Tiefste Ebene: unterirdische Infrastruktur, Versorgungsleitungen, Wartung, Parkierung (nicht durchgängig vorhanden).\nSpäter weitere mehrgeschossige Straßen, z. B. Wabash Avenue. Gebäude: Haupteingänge oben, Liefer- und Servicezugänge unten → Trennung von öffentlichem Stadtraum und Wirtschafts-/Lieferverkehr.\nStädtebauliche Bedeutung: Verkehrsebenen werden vertikal getrennt, lokaler Verkehr ≠ Durchgangsverkehr ≠ Warenverkehr ≠ Fußverkehr. Begrenzter innerstädtischer Raum → Stapeln verschiedener Funktionen, dreidimensionale Stadtstruktur aus dem Grid.' },
+      { h:'Chicago Pedway', t:'Unterirdisches Fußwegenetz im Downtown Chicago, das Gebäude und öffentliche Räume verbindet.\n1951: erste Verbindung zwischen Red Line und Blue Line bei Washington/Jackson, über Jahrzehnte schrittweise erweitert. Heute ca. 5 Meilen / 8 km lang, Verbindung von über 50 Gebäuden in der Downtown.\nZiele: Entlastung des Straßenraums, Trennung von Fuß- und Autoverkehr, wettergeschützte / klimatisierte Wege bei Kälte und schlechtem Wetter.\n1960er–1970er Jahre: Ausbau insbesondere im Zusammenhang mit Downtown-Entwicklungsplanungen, keine einheitliche Gesamtplanung – Erweiterungen häufig im Zuge einzelner Gebäudeprojekte, dadurch uneinheitliches, fragmentiertes Wegenetz.\nHeute neben Fußverkehr auch Geschäfte, Restaurants und Kunst. Kernaussage: Der Pedway ergänzt das oberirdische Straßen- und Multi-Level-System um eine unterirdische Fußgängerebene und verlagert einen Teil des Fußverkehrs aus dem Straßenraum.' },
+      { h:'DuSable Bridge', t:'Brücke der Michigan Avenue, führt direkt zur Magnificent Mile, verbindet Süden und Norden der Stadt über den Chicago River → Burnham Plan Verbreiterung der Michigan Ave.\nErste Doppeldecker-Brücke mit Fahrbahnen auf zwei Ebenen (oben Autoverkehr, unten Hafenverkehr).\nHalbjährliche Öffnung der beiden Brückenhälften für die Route der Segelboote von den Bootswerften zum Lake Michigan.' },
+      { h:'Michigan Avenue', t:'Zentraler Verlauf von Norden nach Süden durch das Straßennetz von Chicago (im Chicago Grid: verläuft bei 100 East).\nUrsprünglich Wohnstraße, seit den 1860ern eher große Wohnhäuser und teure Reihenhäuser.\nAlle Gebäude entlang der Straße wurden beim großen Brand von Chicago 1871 komplett zerstört; danach blieb es zunächst Wohnstraße, in den 1880ern Errichtung erster Geschäftsgebäude.\nMit Eröffnung der DuSable Bridge (Michigan Avenue Bridge) 1920 wurden der nördliche und der südliche Teil der Straße miteinander verbunden.' },
+      { h:'Magnificent Mile', t:'Nördlicher Teil der Michigan Avenue („Mag Mile", deutsch: prächtige Meile).\nBekannte und sehr beliebte Shopping- und Flaniermeile mit eleganten Boutiquen, Warenhäusern, Hotels und Restaurants, bei Touristen und Einwohnern.\nFrüher ebenso nur Wohnstraße, exklusiver Aufstieg seit Bau der Michigan Avenue Bridge / DuSable Bridge.' },
+      { h:'Wrigley Building', t:'Fertigstellung 1924. Kaugummiunternehmer William Wrigley Jr. beschloss, einen neuen Hauptsitz für sein Unternehmen zu bauen – erstes prägendes Gebäude der Magnificent Mile und größeres Geschäftsgebäude, kommerzielle Entwicklung.\nDas Gebäude sollte den Erfolg des Unternehmens widerspiegeln und als Herzstück des neuen „Tores zu Chicago" dienen, das durch Eröffnung der Michigan Avenue Bridge 1920 entstand.\nBis zum Verkauf 2011 an eine Investorengruppe war es der Sitz der Wm. Wrigley Jr. Co., heute ein gemischt genutztes Büro- und Geschäftsgebäude.\nFunfact: Die Kuppel des Gebäudes diente als Aussichtsplattform mit 360°-Blick auf die wachsende Stadt, jeder Besucher erhielt eine Stange Wrigley’s-Kaugummi. 1965 erklärte Frank Sinatra: „Chicago is… the Wrigley Building".' },
+      { h:'Tribune Tower', t:'Fertigstellung 1925 nach einem Wettbewerb für die neue Unternehmenszentrale mit dem Wunsch „the most beautiful and eye-catching building in the world" – der neugotische Entwurf von Raymond Hood und John Mead Howells gewann.\nNutzung durch die Chicago Tribune, die Tribune Company und CNN.\nBesonders bekannt für die Fassade: Bruchstücke weltberühmter Bauwerke sind eingelassen (z. B. Steine der Chinesischen Mauer, Taj Mahal, Cheops-Pyramide, Berliner Mauer, Fragment des ehemaligen World Trade Centers) sowie ein Mondstein im Inneren – auf Straßenebene für Passanten sichtbar.\nFunfact: Wayne Tower aus Batman ist vom Tribune Tower inspiriert, im Film in der Nähe von Chicagos Grant Park verortet.' }
+    ] },
+
+  { nr:5, time:'09:30', name:'Chicago Architecture River Cruise', dur:'90 Min',
+    coords:[-87.62290, 41.88760], img:IMG.cruise,
+    desc:'Bootsfahrt auf dem Chicago River: die Architektur der Stadt vom Wasser aus erleben.',
+    sections:[
+      { h:'Bootsfahrt auf dem Chicago River', t:'Die Architecture River Cruise zeigt die Hochhäuser und Brücken der Stadt vom Wasser aus, entlang des Programms des Anbieters.' }
+    ] },
+
+  { nr:6, time:'11:00', name:'Chicago Architecture Center', dur:'30 Min',
+    coords:[-87.62360, 41.88797], img:IMG.cac,
+    desc:'Vom Regionalplan bis zum Central Area Plan 2045: wie Chicago heute und morgen weitergeplant wird.',
+    sections:[
+      { h:'ON TO 2050 – Regionalplan', t:'Regionalplan für Northeastern Illinois: 7 Countys, 284 Gemeinden. Themen: Verkehr, Siedlungsentwicklung, Wirtschaft, Umwelt und Lebensqualität. Ziel: resilientes, inklusives Wachstum und gezielte Infrastrukturinvestitionen. Aktuell gültiger langfristiger Planungsrahmen bis 2050.' },
+      { h:'Century Plan – zukünftiger Regionalplan', t:'In Erarbeitung als Nachfolger von ON TO 2050. Langfristige Betrachtung von Siedlung, Verkehr, Wirtschaft und Lebensqualität. Entwicklung verschiedener Zukunftsszenarien und gemeinsamer regionaler Strategien. 2026: Analyse und Beteiligung → 2027: geplanter neuer Regionalplan.' },
+      { h:'Central Area Plan 2045 – Downtown Chicago', t:'Räumliche Ebene: Central Area / Downtown Chicago, Zeithorizont bis 2045. Strategischer Entwicklungsrahmen für die zukünftige Entwicklung des Central Area, Umfang: 28 übergeordnete Ziele mit konkreten Maßnahmen.\nGrundidee: Downtown vom klassischen Büro- und Geschäftszentrum zu einem gemischt genutzten, lebendigen Stadtzentrum weiterentwickeln.\n• Wachstum: neue Wohn- und Arbeitsangebote insbesondere in Transformations- und Konversionsgebieten.\n• Öffentlicher Raum: Parks, Plätze, Chicago River und Lakefront als zusammenhängendes öffentliches Freiraumsystem stärken.\n• Mobilität: ÖPNV, Fuß- und Radverkehr sowie Verbindungen zwischen den Downtown-Gebieten verbessern.\n• Klima: Begrünung, Hitzeminderung sowie klimaangepasste Gebäude und Infrastruktur.\n• Inklusion: vielfältigeres Wohnangebot und bessere Zugänglichkeit zu öffentlichen Räumen und Einrichtungen.' },
+      { h:'Zentrale Projekte des Central Area Plan 2045', t:'Fulton Market / Near West: wichtigstes Wachstums- und Transformationsgebiet des Near West, Umwandlung ehemaliger Industrie- und Gewerbeflächen in ein dichtes, gemischt genutztes Quartier, zusätzliche Entwicklung durch geplante Fulton Market Metra Station und neue CTA-Pink-Line-Station an der Madison Street. Kinzie Street: neue Fuß- und Radverbindung zwischen Fulton Market, Near North und Loop.\n\nThe 78 / South Branch: großmaßstäbliche Entwicklung eines ehemaligen Industrieareals am South Branch des Chicago River, gemischte Nutzungen und neue öffentliche Räume entlang des Flussufers, Riverwalk-Verlängerung bis Ping Tom Park, langfristig stärkere Anbindung an Near South und Chinatown.\n\nChicago Riverwalk – South Branch Extension: Verlängerung des bestehenden Riverwalk südlich des heutigen Zentrums bis zur Harrison Street und weiter Richtung The 78 und Chinatown; der Fluss wird stärker als öffentlicher Freiraum und Verbindungsachse genutzt.\n\nLoop – Umnutzung von Bürogebäuden: Downtown soll stärker zu einem gemischt genutzten Stadtteil werden, ältere bzw. untergenutzte Bürogebäude sollen teilweise in Wohnraum (einschließlich Mixed-Income Housing) umgewandelt werden, gleichzeitig Ausbau von Erdgeschossnutzungen, öffentlichen Räumen und kulturellen Angeboten.\n\n606 Trail Extension / Bloomingdale Trail: Verlängerung des bestehenden grünen Rad- und Fußwegenetzes über den Chicago River, Verbindung von Freiraum, aktiver Mobilität und Quartiersentwicklung. 2026 wird eine Finanzierung über ein TIF-Modell diskutiert.' }
+    ] },
+
+  { nr:7, time:'11:30', name:'Chicago Zero Point – State St × Madison St', dur:'30 Min',
+    coords:[-87.62774, 41.88198], img:IMG.zeropoint,
+    desc:'Riverwalk bis zum Nullpunkt des Adresssystems: wie das Chicagoer Grid die Stadt organisiert.',
+    sections:[
+      { h:'Chicago Riverwalk', t:'Fußgängerpromenade entlang des Südufers des Chicago River mit Restaurants, Cafés, Parkanlagen mit Bänken und Aussichtspunkten.\nVerläuft über sechs Straßenblocks vom Lake Shore Drive am Lake Michigan bis zur Lake Street → 6 „Urban Rooms": jeder Block erfüllt ein anderes Bedürfnis.\nÜber einen durchgehenden, kreuzungsfreien Fußgängerweg miteinander verbunden (z. B. Unterführungen unter Brücken), ermöglicht 2 km Flanieren, Joggen oder Gehen ohne Ampeln oder Autoverkehr.' },
+      { h:'Burnham Plan: Lakefront & Parksystem', t:'Handlungsfeld 1 – Lakefront: Verbesserung und Sicherung des Seeufers als öffentlicher Freiraum. Wichtige Auswirkung heute: besonders erfolgreich umgesetzt, ca. 25 von 29 Meilen Seeufer sind heute öffentliches Parkland.\nHandlungsfeld 4 – Parksystem: äußeres Parksystem mit zusammenhängenden Parkway-Ringen.' },
+      { h:'Chicagoer Grid System – Ursprung', t:'Frühes 19. Jh.: durch das Public Land Survey System (PLSS) → rechteckige Landvermessung.\n1785: das von Thomas Jefferson initiierte Rastersystem (PLSS) unterteilt das US-Land rechtwinklig in 6×6 Meilen große Townships und 36 Sections, um nach dem Unabhängigkeitskrieg schnell Schulden zu tilgen.\n1830: James Thompson entwirft den ersten offiziellen Stadtplan mit orthogonalem Straßenraster. Grundprinzip: geradlinige Straßen Nord–Süd / Ost–West → regelmäßige Blocks und Parzellen.\n19. Jh. Stadterweiterung: Annexion umliegender Gemeinden → unterschiedliche Straßennamen und doppelte Hausnummern → zunehmende Orientierungsprobleme.' },
+      { h:'Der Nullpunkt: State Street × Madison Street', t:'1901: Edward P. Brennan schlägt ein einheitliches Straßen- und Nummerierungssystem vor.\n1909: Einführung des neuen Systems, das gesamte Stadtgebiet erhält eine einheitliche räumliche Referenz.\nZero Point: State Street × Madison Street → imaginärer Bezugspunkt des Adresssystems.\nVier Quadranten: State Street + Madison Street gliedern die Stadt in N / S / E / W zur Orientierung. State Street = Nord–Süd-Achse, Madison Street = Ost–West-Achse.\nSteigende Hausnummern = zunehmende Entfernung vom Zero Point. 100 Hausnummern ≈ 1 Block. 800 Hausnummern ≈ 1 Meile vom Zero Point (z. B. 800 N ≈ 1 Meile nördlich, 1600 N ≈ 2 Meilen nördlich).\nWichtige Straßen liegen in regelmäßigen Abständen → Orientierung auch ohne Karte.' },
+      { h:'Städtebauliche Funktion des Grids', t:'Raster als dauerhaftes Erschließungs- und Wachstumssystem → einfache Erweiterung, klare Parzellierung, flexible Neubebauung.\nAbweichungen vom Raster: Chicago River, historische Diagonalstraßen und Lake Michigan → Unterbrechungen bzw. Anpassungen des orthogonalen Systems.\nStadtmorphologische Bedeutung: das Grid prägt bis heute Blocks, Grundstücke, Verkehrswege und das Orientierungssystem.\nKernaussage: Das Grid ist nicht nur ein Straßennetz, sondern ein räumliches Organisations-, Parzellierungs-, Navigations- und Adressierungssystem.' },
+      { h:'Block- und Grundstücksstruktur', t:'Typischer Block: ca. 330 × 660 ft ≈ 100 × 200 m → länglicher Rechteckblock, Seitenlänge jeweils etwa 1/8 Meile ≈ 660 ft ≈ 201 m; Blockmaße variieren je nach Lage.\nTypische Parzelle: ca. 25 × 125 ft ≈ 7,6 × 38 m → schmal und tief. Alley: rückwärtige Erschließung für Versorgung, Anlieferung, Müll, Stellplätze; Hauptadresse bleibt an der Straße.\nKleinteilige Parzellierung: viele schmale Grundstücke → kleinteilige Eigentums- und Bebauungsstruktur. Parzellenzusammenlegung: mehrere 25×125-ft-Parzellen können für größere Bauvorhaben kombiniert werden → Grundlage für größere Gebäude und höhere bauliche Dichte.\nMorphologisches Prinzip: stabiles Blockraster + kleinteilige Parzellen + wandelbare Bebauung. Wichtig: 330×660 ft ist der typische Block, kein überall identisches Maß – Fluss, Eisenbahn, Diagonalstraßen und Sonderentwicklungen erzeugen Abweichungen.' }
+    ] },
+
+  { nr:8, time:'12:00', name:'Willis Tower / Skydeck', dur:'90 Min',
+    coords:[-87.63592, 41.87887], img:IMG.willis,
+    desc:'Stadtstruktur aus der Vogelperspektive: der Loop als Central Business District und die klassischen Stadtmodelle der Chicago School.',
+    sections:[
+      { h:'Stadtstruktur aus der Vogelperspektive', t:'Klares, orthogonales Gitternetz (Grid System). Extrem dichte Kernzone fällt zu niedrigeren Gewerbe-, Industrie- und Wohnbereichen nach Westen und Süden ab.\nModellhafter Aufbau nordamerikanischer Städte mit zonaler Gliederung: zentraler Geschäftsdistrikt → Übergangszone/ehemaliges Gewerbe → Wohnzonen.\nKlare naturräumliche und verkehrliche Grenzen: Lake Michigan im Osten, Chicago River im Norden und Westen sowie Bahnanlagen im Süden fassen den Kern „Loop" physisch ein und erzwingen die Konzentration nach oben.' },
+      { h:'Loop als historischer Central Business District', t:'Funktionales, finanzielles und administratives Herz und Stadtzentrum Chicagos, einer der bedeutendsten Central Business Districts weltweit (zweitgrößter Finanzdistrikt der USA).\nHöchste Bodenpreise der Stadt, Verdrängung des Wohnens, reine Konzentration von Banken, Börsen, Firmenzentralen, Kanzleien und Behörden → veranschaulicht die Verdrängung von Nutzungen mit geringerer Wertschöpfung an den Rand und die Bodenmaximierung an den besten Erreichbarkeitsknotenpunkten.\nHistorisch ein klassischer, nachts ausgedünnter „9-to-5"-Bürodistrikt mit tagsüber mehreren hunderttausend Arbeitskräften und minimaler Wohnbevölkerung.' },
+      { h:'Loop: Entstehung, Funktion und Dichte', t:'Name durch verkehrliche Schleifenbildung: zunächst Wendeschleifen der dampf- und kabelbetriebenen Straßenbahnen, dann ab 1897 Fertigstellung der aufgeständerten Ringtrasse der Hochbahn „L", die das Viertel seither umzingelt.\nErster offizieller Stadtplan von James Thompson 1830 unterteilte das Areal des heutigen Loop in ein rechtwinkliges Raster.\nEnormes Wachstum als dichter Umschlagplatz für Handelsgüter, verstärkt durch Eröffnung des Illinois & Michigan Canal 1848 und den massiven Ausbau der Eisenbahn-Endbahnhöfe am Südrand.\nVor 1871 waren fast alle Gebäude aus Holz. Fast vollständige Zerstörung des Stadtkerns beim Great Fire 1871; der Wiederaufbau schuf die Grundlage für eine radikale Neukonzeption mit baulichem Brandschutz, Parzellenzusammenlegungen und dem Aufstieg als Eisenbahn- und Handelsmetropole.\nSehr hohe Geschossflächenzahlen, vertikale Verdichtung notwendig durch die räumliche Eingrenzung und extreme Bodenwertspitzen. Heute Gegenstand von Konversionsprojekten / „Adaptive Reuse" – Umwandlung von Büroflächen in Appartements und Studentenwohnheime zur Wiederbelebung nach Geschäftsschluss.' },
+      { h:'Loop Grid- und Blockstruktur von oben', t:'Draufsicht auf Rechtwinkligkeit und Weite des Grid-Systems: nahezu alle Straßen verlaufen Nord-Süd oder Ost-West, nach Westen und Süden erstreckt sich das Raster scheinbar endlos.\nNordöstlich des Turms kreuzen sich State Street und Madison Street als Nullpunkt des Systems.\nDer geschwungene Verlauf des Chicago River unterhalb des Turms und die Küstenlinie des Lake Michigan brechen die strikte Geometrie auf und definieren die Ränder des Rasters.\nDurch die exakte Ost-West-Ausrichtung des Rasters lässt sich rund um die Tagundnachtgleiche (März und September) beobachten, wie die tiefstehende Sonne genau in den Straßenschluchten auf- und untergeht.' },
+      { h:'Burnham Plan: Fernstraßen & Eisenbahn', t:'Handlungsfeld 2 – Fernstraßen: Aufbau eines Systems von Highways außerhalb der Stadt, Verbreiterung bestehender Verkehrsachsen und neue Verbindungen zwischen Stadtteilen.\nHandlungsfeld 3 – Eisenbahn: Neuordnung der Bahnhöfe sowie Verbesserung des Güter- und Personenverkehrs.' },
+      { h:'Stadtstrukturmodelle der Chicago School', t:'Entstehung: Chicago School der 1920er–1940er Jahre, empirische Untersuchungen der schnell wachsenden Stadt Chicago. Ziel: Erklärung der Regelhaftigkeiten der wechselseitigen Abhängigkeit des sozialen und wirtschaftlichen Lebens innerhalb der Stadt. 3 klassische Modelle: Burgess (1925), Hoyt (1939), Harris/Ullman (1945).' },
+      { h:'1. Ringmodell – E. W. Burgess (1925)', t:'Anhand von Chicago entwickelt: Stadtwachstum in 5 konzentrischen Zonen.\n1. CBD / Loop: Handel, Verwaltung, höchste Bodenpreise.\n2. Zone of Transition: Industrie, Einwanderer, günstiger Wohnraum, soziale Problemlagen.\n3. Workingmen’s Homes: Arbeiter- und Facharbeiterwohngebiete.\n4. Residential Zone: Mittelschicht, bessere Wohnlagen.\n5. Commuter Zone: Vororte, größere Grundstücke, Pendler, Oberschicht.\nPrinzip: Wachstum vom Zentrum nach außen. „Invasion & Succession": neue Bevölkerungsgruppen/Nutzungen verdrängen ältere, Bildung neuer Ringe durch sozialen Aufstieg. Das Zentrum organisiert die Peripherie.' },
+      { h:'2. Sektorenmodell – H. Hoyt (1939)', t:'Untersuchung von Miet- und Bodenpreisen in 30 US-Städten. Wohngebiete unterschiedlicher Miethöhen entwickeln sich sektorartig vom Zentrum zur Peripherie.\nAusgangspunkt: große Verkehrsachsen und Wohnstandortwahl statushoher Bevölkerungsgruppen. Bodenpreise sinken nicht gleichmäßig vom Zentrum nach außen → stabile Sektoren unterschiedlicher Bodenpreise.\nIndustrieanlagen und Verkehrswege → niedrige Bodenpreise, bevorzugte Wohnstandorte der Arbeiterschaft. Statushöhere Bevölkerung wählt Wohnlagen mit geringeren Emissionen und Belastungen.' },
+      { h:'3. Mehrkernmodell – Harris & Ullman (1945)', t:'Fokus auf Nutzungsverteilung innerhalb der Stadt: Stadt nicht um ein einziges Zentrum organisiert, sondern mehrere funktionale Kerne (z. B. CBD, Industriegebiete, Parks, Shopping-Center).\nUm die City: Unter- und Mittelschichtwohngebiete, angrenzend Industriegebiete. Stadtrand/Suburbia: locker bebaute Oberschichtwohngebiete.\nMit zunehmender Stadtgröße: mehr Kerne und stärkere Spezialisierung. Von den drei klassischen Modellen am ehesten realitätsnah.\nKritik an allen drei Modellen: nur für schnell wachsende Städte in kapitalistischen Staaten und freier Marktwirtschaft geeignet, berücksichtigt nur zwei Gliederungsmöglichkeiten (funktional + sozialräumlich), vertikale Differenzierung (Zusammenhang von Nutzung und Gebäudehöhe) fehlt.' }
+    ] },
+
+  { nr:9, time:'13:30', name:'Mittagessen bei Giordano’s', dur:'90 Min',
+    coords:[-87.62760, 41.87830], img:IMG.giordanos, virtual:true,
+    desc:'Deep-Dish Pizza, wenige Minuten Fußweg vom Willis Tower. Kein inhaltlicher Programmpunkt.',
+    sections:[] },
+
+  { nr:10, time:'15:00', name:'Rookery Building', dur:'30 Min',
+    coords:[-87.63235, 41.87905], img:IMG.rookery,
+    desc:'Chicagos ältestes erhaltenes Hochhaus: drei Architektenepochen und der Sprung in die Vertikale.',
+    sections:[
+      { h:'Chicago School / First Chicago School', t:'Bezeichnung für eine Gruppe von Architekten, die die frühe Hochhaus- und Geschäftshausarchitektur Chicagos prägten (ca. 1880–1900): konstruktive Innovation, Stahlskelett, große Fensterflächen und funktionale Grundrisse; u. a. Louis Sullivan, William Le Baron Jenney, Dankmar Adler, Daniel Burnham und John Wellborn Root.\nLouis Sullivan (1856–1924) prägte die Chicago School und die frühe Hochhausarchitektur: Verbindung von neuer Tragstruktur, Funktion und Fassadengestaltung, bekanntes Prinzip „form follows function". Wichtige Werke: Auditorium Building, Carson Pirie Scott Building.' },
+      { h:'Rookery Building', t:'Ältestes erhaltenes Hochhaus Chicagos, fertiggestellt 1888 vom Architekturbüro Burnham und Root. 12 Geschosse, 55 m Höhe – damals eines der höchsten Gebäude der Welt. Heute gewerbliches Bürogebäude.\nSchichtung dreier Epochen/Architekten über eine Zeitspanne von mehr als 40 Jahren:\n• Burnham & John Wellborn Root (1888): Fundament aus tragendem Mauerwerk in den unteren Geschossen, kombiniert mit einem frühen eisernen Skelettrahmen in den oberen Etagen, ermöglichte für die damalige Zeit außergewöhnlich große Fenster und offene Grundrisse.\n• Frank Lloyd Wright (1905–1907): zweigeschossige, von einem Glas-Eisen-Oberlicht überdachte Innenhof-Lobby mit geschwungener Haupttreppe.\n• William Drummond (1931): Art-déco-Ergänzung mit feinen Details und funktionalen Änderungen im Lobbybereich.\nPrinzip des „floating raft foundation": kreuzweise verlegte Stahl-/Eisenträger verteilen das Gewicht eines hohen, schweren Gebäudes flächig auf dem Untergrund. Größtes erhaltenes Beispiel für den frühen kommerziellen Wolkenkratzer, der Sprung in die Vertikale.' },
+      { h:'Historische Hochhausentwicklung', t:'Nach dem großen Feuer 1871: Atmosphäre des Experimentierens und der Innovation. Das mehrstöckige Bürogebäude sollte die Landschaft der amerikanischen Städte verändern.\nInnovative Bauweise, Personenaufzüge, feuerfeste Konstruktionen und elektrische Beleuchtung als Übergangsstruktur in Richtung der Moderne – diese Elemente machten die Hochhausstadt funktionsfähig.\nDie „floating raft foundation" wurde zur Grundlage für spätere Supertall-Wolkenkratzer wie den Willis Tower. Die Hybridbauweise aus innerem Eisenskelett und teilweise tragender Außenwand war ein Vorläufer des Stahlskeletts. Technische Infrastruktur (Aufzüge, elektrische Beleuchtung, Brandschutz) machte das Hochhaus als vertikale Gewerbefläche rentabel und sicher.' },
+      { h:'Auswirkungen der Hochhausentwicklung', t:'Vertikale Verdichtung und Veränderung der Bodenökonomie: Konzentration von Wohn- und Arbeitsraum in die Höhe spart Grundfläche, verkürzt Pendlerwege, entlastet Infrastruktur und schafft Platz für Grün- und Freiflächen. Maximierung der Geschossflächenzahl und Rendite pro Quadratmeter Grundstücksfläche. Gegenreaktion: ansteigende Grundstückspreise, da Boden nicht mehr nach reiner Fläche, sondern auch nach vertikalem Potenzial bewertet wird.\nReaktion auf Wachstum und Verdichtungsdruck: enormes Potenzial zur Bewältigung von Klimawandel und Ressourcenknappheit, maximale Raumausnutzung, mögliche Bündelung von Gewerbe, Büros, Wohnraum und öffentlichen Nutzungen in einem Baukörper.\nAuswirkungen auf die Stadtstruktur: Veränderung des Stadtbilds durch die Skyline, oft in Konkurrenz zu traditionellen Landmarken; Verlust des menschlichen Maßstabs; punktuelle Belastungsspitzen für ÖPNV, Straßennetz und Kanalisation; Einsparung horizontaler Wege durch Mischnutzungen im selben Gebäude.' }
+    ] },
+
+  { nr:11, time:'15:30', name:'Federal Plaza', dur:'30 Min',
+    coords:[-87.62930, 41.87860], img:IMG.federal,
+    desc:'Mies van der Rohes Federal Center: moderne Architektur, öffentlicher Raum und Calders „Flamingo".',
+    sections:[
+      { h:'Prairie School & Frank Lloyd Wright', t:'Architekturströmung aus Chicago und dem Mittleren Westen (ca. 1900–1915), vor allem geprägt durch Frank Lloyd Wright (1867–1959): horizontale Gebäude, offene Grundrisse und die Verbindung von Architektur und Landschaft als eigenständige amerikanische Architektursprache – eine Reaktion auf die traditionelle, historisch geprägte Stadtarchitektur.' },
+      { h:'International Style / Second Chicago School', t:'Moderne Architekturströmung ab den 1930ern, prägend ab den 1950ern, insbesondere durch Ludwig Mies van der Rohe (1886–1969): Stahl und Glas, klare Raster, regelmäßige Fassaden, Reduktion und Verzicht auf Ornament – prägend für die Nachkriegsskyline Chicagos.\nMies van der Rohe war ab 1937 in Chicago tätig, Leiter der Architekturabteilung am IIT. Konsequente Verwendung von Stahl und Glas, klare Raster, reduzierte Formen und offene Grundrisse. Wichtige Werke: 860–880 Lake Shore Drive, Federal Center, 330 N Wabash, Crown Hall.' },
+      { h:'Postmoderne & zeitgenössische Architektur', t:'Postmoderne (ab ca. 1970er/80er): Reaktion auf die reduzierte, universelle Formensprache der Nachkriegsmoderne, Rückkehr zu historischen Bezügen und Ornament, in Chicago u. a. durch Helmut Jahn vertreten.\nZeitgenössische Architektur (seit ca. 1990er): stärkerer Fokus auf Nutzungsmischung, öffentliche Räume, Nachhaltigkeit und neue Gebäudeformen, z. B. Aqua Tower von Studio Gang.' },
+      { h:'Federal Plaza als öffentlicher Raum', t:'Bundeszentrum Chicagos, Platz von Mies van der Rohes Chicago Federal Center, ein Komplex aus drei Gebäuden unterschiedlicher Größenordnung – sollte Teil der Wiederbelebung des Loop sein. Aufteilung von Regierungsbüros, einem Gerichtsgebäude und einem Postamt in drei verschiedene Gebäude.\nPlatz für regelmäßige (Bauern-)Märkte, Festivals und politische Versammlungen/Proteste, symbolisch für die aktive Beziehung zwischen Einwohnern, Regierung und Unternehmen.\nGranitfliesen des Platzes fließen kontinuierlich in die verglasten Lobbys der Gebäude über, Verbindung von Innen- und Außenräumen. Wenig Begrünung und Sitzflächen, dafür ein offener Aufenthaltsbereich.\nKunst im öffentlichen Raum: „Flamingo" ist die berühmte rote Skulptur von Alexander Calder, ein greller Farbpunkt im Kontrast zum Grau des Platzes und symbolischer Gegenpol zur farblich schlichten Architektur der Bundesgebäude. Die geradlinigen, symmetrischen Gebäudekomplexe stehen der krummlinigen, organischen Form des Flamingos gegenüber; die Skulptur ist interaktiv konzipiert, mit Bögen zum Darunter- und Herumlaufen.' },
+      { h:'Erdgeschossnutzungen und Lobbys', t:'Paradebeispiel für eine klassische, moderne amerikanische Lobby, Konzept des „Universal Space". Nahtloser Bodenübergang: Granitplatten laufen ohne Unterbrechung direkt in die Lobby hinein. Die gläserne Fassade wirkt beinah wie eine unsichtbare Schicht, die Lobby erscheint als überdachte Fortsetzung des öffentlichen Raums.\nVertikale Nutzungsmischung wird oft verstärkt durch Erdgeschosse mit repräsentativen Lobbys/Durchgängen, im Gegensatz zu den privat gehaltenen Obergeschossen mit Büros oder Wohnungen.' }
+    ] },
+
+  { nr:12, time:'16:00', name:'Hochbahn LaSalle/Van Buren – „Elevated L"', dur:'30 Min',
+    coords:[-87.63180, 41.87650], img:IMG.cbot,
+    desc:'Fahrt mit der Hochbahn: wie die „L" seit 1892 die mehrgeschossige Verkehrsstadt Chicagos prägt.',
+    sections:[
+      { h:'Mobilität & Multi-Level City', t:'1892: Eröffnung der ersten Hochbahn als Reaktion auf starkes Bevölkerungswachstum, steigende Verkehrsnachfrage und die Überlastung des Straßenraums.\n1897: Fertigstellung des Loop Elevated → Verbindung der Hochbahnlinien aus Nord-, Süd- und Westseite direkt mit dem Central Business District; der Loop wurde damit zu einem zentralen Knoten des innerstädtischen Verkehrs.\nDie Hochbahn wurde überwiegend über bestehenden Straßen und teilweise über Alleen geführt → leistungsfähiger ÖPNV, ohne zusätzlichen Straßenraum am Boden zu beanspruchen.\nDadurch entstand früh eine mehrgeschossige Verkehrsstadt: Straßenverkehr und Fußverkehr auf Bodenniveau, Hochbahn darüber; die Infrastruktur wurde unmittelbar Teil des Stadtbildes.\nBis heute prägt die „L" die räumliche Wahrnehmung Chicagos; insbesondere aus der Hochbahnperspektive werden Gebäudefassaden, Blockstruktur und Dichte des Loop anders erfahrbar als auf Straßenebene.' }
+    ] },
+
+  { nr:13, time:'16:30', name:'Daley Plaza', dur:'30 Min',
+    coords:[-87.63000, 41.88400], img:IMG.daley,
+    desc:'Civic Center des Burnham Plans, Bürgermeister Daleys Stadtumbau und das Picasso als Wahrzeichen.',
+    sections:[
+      { h:'Nachkriegszeit & Stadtumbau unter Daley', t:'1955–1976: Richard J. Daley als Bürgermeister. Massive Konflikte zwischen Polizei und Demonstrierenden als prägendes Beispiel für Daleys autoritäre Stadtpolitik.\nGroßmaßstäblicher Stadtumbau: Straßenbau, Infrastruktur- und Wohnungsbauprojekte, Modernisierung des Stadtzentrums. Folgen: Abriss bestehender traditioneller Quartiere, Verdrängung von Bevölkerung, Verstärkung räumlicher und sozialer Segregation – bis heute spürbar.' },
+      { h:'Burnham Plan: Civic Center', t:'Handlungsfeld 6: Entwicklung von Zentren für Bildung, Kultur und Verwaltung → stärkere räumliche Einheit der Stadt. Planungen waren bei der Congress Street und Halsted Street vorgesehen, aber nie realisiert; heute steht dafür das Daley Center.' },
+      { h:'Richard J. Daley Center und Daley Plaza', t:'Von Architekt Jacques Brownson, ursprünglich Chicago Civic Center genannt – Chicagos erstes großes öffentliches Gebäude im modernen Stil, Bestärkung des Loops als traditioneller Stadtkern, städtisches und kulturelles Zentrum.\nÖffentliches Gebäude mit Platz als offenem Raum, Nutzung für Gerichtssäle sowie Regierungs- und Verwaltungsbüros. Platz direkt angrenzend an Chicago City Hall, Court House und Department of Finance.' },
+      { h:'Öffentlicher Raum und Platzgestaltung', t:'Gestaltung nach dem „less is more"-Gedanken von Mies van der Rohe, optische Auflösung der Grenze zwischen Außen- und Innenraum durch die Bodengestaltung.\nWeiteres Beispiel für Kunst im öffentlichen Raum: die Skulptur „Chicago Picasso" als Symbol der Stadt. Breites, flaches Wasserbecken mit zahlreichen Fontänen, symmetrische Anordnung von Skulptur, Brunnen und wenigen Sitzbänken.\nFlexible Nutzung als öffentliche Bühne: bewusst frei von dauerhafter Möblierung, fungiert gleichermaßen als Ort für politischen Protest, Aufenthalt in der Mittagspause und Fundament für Großveranstaltungen – auch für Hochzeiten, Festivals und Firmenveranstaltungen. Kostenlose kulturelle Programme wochentags von 12 bis 13 Uhr, etwa Singen oder Tanzen.' },
+      { h:'Gesellschaftliche/politische Bedeutung', t:'Der Platz liegt genau im Mittelpunkt der Macht: im Norden begrenzt durch das Justizzentrum des Daley Centers, im Westen vom Rathaus und Verwaltungsgebäuden.\nDemonstrationen als direkte Konfrontationen, oftmals Proteste gegen systemische Ungerechtigkeiten im Justizsystem und gesellschaftliche Debatten: Antikriegsproteste, Bürgerrechtsbewegung, Klimastreiks. Kulturelle Repräsentation durch regelmäßig stattfindende Kulturwochen.' }
+    ] },
+
+  { nr:14, time:'17:00', name:'Wolf Point', dur:'30 Min',
+    coords:[-87.63690, 41.88780], img:IMG.wolfpoint,
+    desc:'Von der Industriestadt zur Flussumkehr: wie Wolf Point den Chicago River als Wasserspüler nutzt.',
+    sections:[
+      { h:'Chicago im 20. Jahrhundert', t:'Um 1900: ca. 1,7 Mio. Einwohner. Probleme durch Industrialisierung, Bevölkerungswachstum und starke Verschmutzung des Lake Michigan.\n1889: Bildung des Sanitary District of Chicago. 1900: Eröffnung des Sanitary and Ship Canal → dauerhafte Umkehrung des Chicago River, das Wasser fließt vom Lake Michigan weg in Richtung Illinois River. Ziel: Abwasser vom Trinkwasservorrat des Lake Michigan fernhalten.\nChicago als Industriestadt: heruntergekommene Arbeitersiedlungen, Schlachthäuser der Fleischindustrie.' },
+      { h:'Wolf Point', t:'Umlenkung des North Branch am Wolf Point: Vor 1900 transportierte dieser Nordarm den gesamten Industriedreck nach Osten in den See; seit der Kanaleröffnung knickt seine Mündung an der Wolf-Point-Gabelung scharf nach Süden ab, wodurch das Wasser landeinwärts umgeleitet wird.\nFunktion als natürlicher „Wasserspüler": Da der Nordarm seine Fließrichtung selbst nicht änderte, liefert er seither von Norden her eine kontinuierliche Wassermenge; diese erzeugt am Wolf Point den nötigen Druck, um den Unrat aktiv nach Süden aus dem Stadtzentrum herauszuspülen.' },
+      { h:'Städtebaulicher Kontrast zum Loop', t:'Wandel von dichten Hochhäusern und Blockbebauung mit minimaler Freifläche hin zu niedrigeren Gebäudehöhen, vereinzelt durchbrochen von neueren Glasbauten – ein starker Kontrast im Städtebau. Vom klassischen Geschäftszentrum zum modernen Techviertel.\nFulton Market ist tagsüber eher ruhig, im Gegensatz zum Loop (Wohnbevölkerung überwiegend Berufstätige). Der Chicago River bildet eine physische Trennung zum Loop.\nSehr bekannt für die Gastromeile mit Köchen aus dem ganzen Land und einer enormen Dichte an Essensmöglichkeiten. Identität des Viertels: Essen, Berufsleben und Ästhetik industrieller Umnutzung.' }
+    ] },
+
+  { nr:15, time:'17:30', name:'Fulton Market District', dur:'90 Min',
+    coords:[-87.64860, 41.88650], img:IMG.fulton,
+    desc:'Vom Schlachthofviertel zum Innovationsbezirk: Industrialisierung, Migration und Gentrifizierung im Fulton Market.',
+    sections:[
+      { h:'Industrialisierung & Haymarket Memorial', t:'Ende 19. Jh.: massive Industrialisierung (Konzentration am Chicago River, Eisenbahnlinien und Stockyards) → stark wachsende Arbeiterschaft, soziale Probleme durch Verarmung, Einsatz für soziale Rechte.\n1. Mai 1886: Streiks für den 8-Stunden-Arbeitstag, ursprünglich 12 Stunden – die „Haymarket Riots". Eskalation zwischen Arbeitern und Polizei, internationaler Bezug des 1. Mai als Tag der Arbeit, wichtiges Zentrum der US-amerikanischen Arbeiterbewegung.' },
+      { h:'Migration & räumliche Segregation', t:'1910, „Great Migration" nach dem Ersten Weltkrieg: schwarze Bevölkerung aus den Südstaaten wandert nach Chicago, billige Arbeitskräfte insbesondere in Industrie und Fleischverarbeitung.\nKonzentration vieler schwarzer Migranten auf der South Side, Entstehung eines wichtigen afroamerikanischen kulturellen und wirtschaftlichen Zentrums – gleichzeitig ethnisch und sozial stark differenzierte Stadtteile und räumliche Segregation.' },
+      { h:'Prohibition & Nachkriegszeit', t:'1920–1933: Prohibition, illegale Produktion und Vertrieb von Alkohol – Chicago als Zentrum des Bootlegging, Al Capone als bekanntester Vertreter der organisierten Kriminalität (105 Millionen Dollar Einnahmen).\n1930: die „große Depression" führte zu Bankrotten und Massenentlassungen, soziale Spannungen.\n1950: Bevölkerungshöchststand von ca. 3,6 Mio. In der zweiten Hälfte des 20. Jh.: Suburbanisierung durch Abwanderung der Mittelschicht.\n1960er/70er Jahre: Bürgerrechtsbewegung, Proteste gegen Rassismus, Vietnamkriegsproteste, Martin Luther King Jr. in Chicago.\nSeit den 1990er Jahren: erneutes Bevölkerungs- und Wirtschaftswachstum durch Zuwanderung aus Asien und Lateinamerika, Entwicklung ehemaliger Industrie- und Hafenareale, zunehmende Revitalisierung innerstädtischer Räume.' },
+      { h:'Historische Industrie- und Gewerbenutzung', t:'Im 19. Jh. ehemaliges Schlachthofviertel und Zentrum der Fleischverpackungsindustrie von Chicago, geprägt von Verarbeitungsbetrieben, die andere Unternehmen wie Bäckereien anzogen. Niedrige Industriegebäude mit großer Breite prägen bis heute die Straßen des alten Großhandelsviertels.\nWeltwirtschaftskrise der 1920er: große Herausforderung für die Industrie, Beginn eines Abwärtstrends, viele Betriebsschließungen. Zudem Verlust der zwingend zentralisierten Fleischindustrie durch Kühlungstechnologien → verlassene Lagerhäuser und Anstieg von Kriminalität in den 60ern und 70ern, ein gemiedenes Viertel.' },
+      { h:'Transformation eines ehemaligen Industriegebiets', t:'2000: der „Near West Side Land Use Plan" beschreibt Fulton Market als besonderes Viertel mit Schutzwürdigkeit der ansässigen Unternehmen und kulturellen Aspekten wie der Infrastruktur.\nAb 2010: Entwicklung zum begehrten Immobilienviertel Chicagos. Wohneinheiten: vor 2017 gesamt 450, 2020 gesamt 894, zukünftige Gesamtsumme 3.725. Restaurant/Einzelhandel: vor 2017 gesamt 56, 2020 gesamt 120+. Büro: vor 2017 gesamt 995.898 qm, 2020 gesamt 4.360.895 qm, zukünftige Gesamtsumme 8.100.883 qm.\nAnsiedlung von Großkonzernen wie Google und McDonald’s → beliebte Restaurants, Bars und Hotels, bestärkt durch die industrielle Architektur aus roten Ziegeln.\n2014: das Quartier wird Chicagos erster Innovationsbezirk, Konzentration auf die Koexistenz historischer und moderner Bauten sowie die Erhaltung der Infrastruktur.\nHeute: modernes Stadtwandlungsprojekt und Umnutzung zum „Mixed-Use Quartier" und zur „15-Minute-City". Industriegebäude sind heute Restaurants mit Außenbereichen, noble Hotels und Sitze von Technologiekonzernen. Industrieästhetik durch freiliegende Ziegel und umgenutzte Laderampen als Restauranteingänge. Licht bricht sich an Glasfassaden neuerer Hochhäuser und reflektiert auf altem Mauerwerk – eine Verbindung historischer und gegenwärtiger Strukturen.' },
+      { h:'Bodenwertsteigerung und Gentrifizierung', t:'Die Entwicklung führte zu einem Wandel in Bezug auf die Bevölkerung: Anstieg um 28 % der Einwohner, aber gleichzeitige Veränderung der Migrationsanteile in den letzten zehn Jahren – vor allem die afrikanische Gemeinschaft im Viertel wurde verdrängt.\nZwischen 2019 und 2021 vervierfachte sich der durchschnittliche Kaufpreis für Grundstücke und Immobilien, die Quadratmeterpreise haben sich in dieser Zeit mehr als verdoppelt, die mittlere Miete liegt doppelt so hoch wie der nationale Durchschnitt.\nStarke Verdrängung ursprünglicher Nutzer: traditionsreiche Fleischgroßhändler sind wirtschaftlich nicht mehr konkurrenzfähig und ziehen in die Vororte um.' }
+    ] }
+];
+
+/* Fahrtprofil je Etappe: Cruise per Boot, Hochbahn per Zug.
+   Diese Abschnitte werden gestrichelt statt als Fußweg gezeichnet. */
+const NON_WALK = new Set(['5', '12']); // Zielstation dieser Etappe ist keine Fußstrecke
+
+/* =========================================================================
+   Karte, Dusk Vivid
+   ========================================================================= */
+const map = new mapboxgl.Map({
+  container:'map',
+  style:'mapbox://styles/mapbox/standard',
+  center:[-98.5, 39.5],   // Start: gesamte USA
+  zoom:3.2,
+  pitch:0,
+  bearing:0,
+  antialias:true,
+  projection:'globe'
+});
+
+let activeId = null;
+let isProgrammatic = false;
+let introDone = false;
+const markers = new Map();
+const cards = new Map();
+let popup = null;
+
+map.on('style.load', () => {
+  /* Dusk Vivid: lightPreset dusk + theme default (das lebendige, nicht faded).
+     Standard bringt die 3D-Gebäude selbst mit, kein eigener Extrusion-Layer nötig. */
+  map.setConfigProperty('basemap', 'lightPreset', 'dusk');
+  map.setConfigProperty('basemap', 'theme', 'default');
+  map.setConfigProperty('basemap', 'show3dObjects', true);
+  map.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
+
+  map.setFog({
+    'color':'#1b2a3d',
+    'high-color':'#2a4763',
+    'horizon-blend':0.08,
+    'space-color':'#070c16',
+    'star-intensity':0.12
+  });
+});
+
+map.on('load', async () => {
+  await buildRoute();
+  addMarkers();
+  startIntro();
+});
+
+/* =========================================================================
+   Route: echte Wege über die Directions API, folgt den Straßen
+   ========================================================================= */
+async function buildRoute(){
+  const pts = STOPS.filter(s => s.coords);
+
+  /* Etappen bilden: Fußwege werden geroutet, Boot und Hochbahn bleiben direkt. */
+  const walkSegs = [];
+  const directSegs = [];
+  for (let i = 0; i < pts.length - 1; i++){
+    const a = pts[i], b = pts[i + 1];
+    (NON_WALK.has(String(b.nr)) ? directSegs : walkSegs).push([a.coords, b.coords]);
+  }
+
+  /* Zusammenhängende Fußweg-Ketten in möglichst wenige Requests bündeln */
+  const chains = [];
+  for (const seg of walkSegs){
+    const last = chains[chains.length - 1];
+    if (last && last[last.length - 1].join() === seg[0].join()) last.push(seg[1]);
+    else chains.push([seg[0], seg[1]]);
+  }
+
+  const walkFeatures = [];
+  for (const chain of chains){
+    const coordStr = chain.map(c => c.join(',')).join(';');
+    try {
+      const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${coordStr}`
+                + `?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.code === 'Ok' && data.routes && data.routes[0]){
+        walkFeatures.push({ type:'Feature', properties:{},
+          geometry:data.routes[0].geometry });
+      } else {
+        /* Directions nicht verfügbar: als Luftlinie zeichnen statt nichts */
+        walkFeatures.push({ type:'Feature', properties:{},
+          geometry:{ type:'LineString', coordinates:chain } });
+      }
+    } catch (_) {
+      walkFeatures.push({ type:'Feature', properties:{},
+        geometry:{ type:'LineString', coordinates:chain } });
+    }
+  }
+
+  map.addSource('route', { type:'geojson',
+    data:{ type:'FeatureCollection', features:walkFeatures } });
+  map.addSource('route-direct', { type:'geojson',
+    data:{ type:'FeatureCollection', features:directSegs.map(s => ({
+      type:'Feature', properties:{}, geometry:{ type:'LineString', coordinates:s } })) } });
+
+  /* Dunkles Casing, damit die Linie auf der Dusk-Karte Kante hält */
+  map.addLayer({ id:'route-casing', type:'line', source:'route',
+    layout:{ 'line-cap':'round', 'line-join':'round' },
+    paint:{ 'line-color':'#08111e', 'line-width':9, 'line-opacity':.85 } });
+
+  map.addLayer({ id:'route-line', type:'line', source:'route',
+    layout:{ 'line-cap':'round', 'line-join':'round' },
+    paint:{
+      'line-color':'#3FB6D0',
+      'line-width':['interpolate',['linear'],['zoom'],11,3,16,5.5],
+      'line-opacity':.98,
+      'line-emissive-strength':1
+    } });
+
+  /* Boot und Hochbahn: gestrichelt, damit klar ist, dass man nicht läuft */
+  map.addLayer({ id:'route-direct-line', type:'line', source:'route-direct',
+    layout:{ 'line-cap':'round', 'line-join':'round' },
+    paint:{
+      'line-color':'#8FA6BC',
+      'line-width':3,
+      'line-dasharray':[1.6, 1.8],
+      'line-opacity':.85,
+      'line-emissive-strength':1
+    } });
+}
+
+function addMarkers(){
+  STOPS.forEach(stop => {
+    if (!stop.coords) return;
+    const el = document.createElement('button');
+    el.className = 'marker' + (stop.virtual ? ' is-virtual' : '');
+    el.type = 'button';
+    el.textContent = stop.nr;
+    el.setAttribute('aria-label', `${stop.time} Uhr, ${stop.name}`);
+    el.addEventListener('click', e => { e.stopPropagation(); selectStop(stop.nr); });
+    new mapboxgl.Marker({ element:el, anchor:'center' })
+      .setLngLat(stop.coords).addTo(map);
+    markers.set(stop.nr, el);
+  });
+}
+
+/* =========================================================================
+   Intro: Anflug USA -> Chicago -> Station 1
+   ========================================================================= */
+function startIntro(){
+  const intro = document.getElementById('intro');
+  const fill = document.getElementById('intro-fill');
+  const skip = document.getElementById('intro-skip');
+
+  /* Sheet hereinfahren lassen und die Wartestellung aufheben */
+  const revealSheet = () => {
+    sheet.classList.add('is-entering');
+    sheet.classList.remove('is-waiting');
+    setTimeout(() => sheet.classList.remove('is-entering'), 700);
+  };
+
+  const finish = () => {
+    if (introDone) return;
+    introDone = true;
+    intro.classList.add('is-gone');
+    document.getElementById('top-bar').classList.add('is-in');
+    document.getElementById('tour-nav').classList.add('is-in');
+    revealSheet();
+    setTimeout(() => selectStop(1, 'intro'), 250);
+  };
+
+  if (REDUCED_MOTION){
+    map.jumpTo({ center:STOPS[0].coords, zoom:15.3, pitch:45, bearing:0 });
+    fill.style.width = '100%';
+    finish();
+    return;
+  }
+
+  fill.style.transition = 'width 5200ms linear';
+  requestAnimationFrame(() => { fill.style.width = '100%'; });
+
+  skip.addEventListener('click', () => {
+    map.stop();
+    map.jumpTo({ center:STOPS[0].coords, zoom:15.3, pitch:45, bearing:0 });
+    finish();
+  });
+
+  /* Stufe 1: USA -> Großraum Chicago */
+  setTimeout(() => {
+    if (introDone) return;
+    map.flyTo({ center:[-87.65, 41.87], zoom:9.2, pitch:0, bearing:0,
+                duration:2600, curve:1.42, essential:true });
+  }, 700);
+
+  /* Stufe 2: Chicago -> Downtown, Kamera kippt leicht in die 3D-Ansicht,
+     bereits in Nordausrichtung, damit der Übergang zu selectStop() nicht springt. */
+  setTimeout(() => {
+    if (introDone) return;
+    map.flyTo({ center:[-87.628, 41.881], zoom:14.4, pitch:45, bearing:0,
+                duration:3000, curve:1.5, essential:true });
+  }, 3300);
+
+  /* Stufe 3: Ankunft an Station 1 */
+  setTimeout(() => {
+    if (introDone) return;
+    intro.classList.add('is-gone');
+    document.getElementById('top-bar').classList.add('is-in');
+    document.getElementById('tour-nav').classList.add('is-in');
+    revealSheet();
+  }, 5400);
+
+  setTimeout(() => {
+    if (introDone) return;
+    introDone = true;
+    selectStop(1, 'intro');
+  }, 6100);
+}
+
+/* =========================================================================
+   Auswahl: eine Quelle der Wahrheit für Karte, Popup und Liste
+   ========================================================================= */
+function selectStop(nr, source = 'map'){
+  const stop = STOPS.find(s => s.nr === nr);
+  if (!stop) return;
+
+  activeId = nr;
+
+  markers.forEach((el, id) => el.classList.toggle('is-active', id === nr));
+  cards.forEach((el, id) => {
+    const on = id === nr;
+    el.classList.toggle('is-active', on);
+    el.setAttribute('aria-current', on ? 'true' : 'false');
+  });
+
+  /* Auf dem Handy das Sheet klein halten, solange ein Popup die Infos zeigt.
+     Punkte ohne Ort haben kein Popup, dort bleibt die Liste auf halber Höhe.
+     Hat der Nutzer die Liste manuell geschlossen, bleibt sie zu — die Karte
+     behält den vollen Platz, bis sie selbst wieder geöffnet wird. */
+  const wantSnap = (!DESKTOP() && stop.coords) ? 'peek' : 'half';
+  const snapChanged = !DESKTOP() && snap !== 'closed' && snap !== wantSnap;
+  if (snapChanged) setSnap(wantSnap);
+
+  if (stop.coords){
+    isProgrammatic = true;
+    /* Fester Nordblick mit spürbarer, aber moderater 3D-Neigung: Gebäude
+       bleiben als Baukörper erkennbar, versperren aber nicht die Sicht
+       auf den Marker. Kein manuelles Drehen nötig. */
+    const camera = { center:stop.coords, zoom:15.3, pitch:45, bearing:0,
+                     offset:cameraOffset() };
+    if (REDUCED_MOTION){
+      /* jumpTo kennt kein offset, easeTo mit Dauer 0 springt genauso hart */
+      map.easeTo({ ...camera, duration:0 });
+      isProgrammatic = false;
+    } else {
+      map.easeTo({ ...camera, duration:900, essential:true });
+    }
+
+    showPopup(stop);
+  } else {
+    /* Punkt ohne Ort: kein Kameraflug, nur Popup schließen */
+    if (popup) { popup.remove(); popup = null; }
+  }
+
+  if (source !== 'list'){
+    if (snapChanged && !REDUCED_MOTION) setTimeout(() => scrollCardIntoView(nr), 260);
+    else scrollCardIntoView(nr);
+  }
+
+  updateTourNav();
+}
+
+/* Popup mit Bild, Zeit, Kurzbeschreibung und Themenschwerpunkten */
+function showPopup(stop){
+  if (popup) popup.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pop';
+
+  const img = document.createElement('img');
+  img.className = 'pop__img';
+  img.alt = stop.name;
+  img.loading = 'lazy';
+  wireImage(img, stop);
+
+  const body = document.createElement('div');
+  body.className = 'pop__body';
+
+  const time = document.createElement('div');
+  time.className = 't-eyebrow pop__time';
+  time.textContent = `${stop.time} Uhr, ${stop.dur}`;
+
+  const title = document.createElement('h2');
+  title.className = 'pop__title';
+  title.textContent = stop.name;
+
+  const desc = document.createElement('p');
+  desc.className = 'pop__desc';
+  desc.textContent = stop.desc;
+
+  body.append(time, title, desc);
+
+  if (stop.sections && stop.sections.length){
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'pop__more';
+    more.textContent = 'Mehr erfahren';
+    more.addEventListener('click', e => { e.stopPropagation(); openDetail(stop.nr); });
+    body.append(more);
+  }
+
+  wrap.append(img, body);
+  wrap.style.cursor = stop.sections && stop.sections.length ? 'pointer' : '';
+  if (stop.sections && stop.sections.length){
+    wrap.addEventListener('click', () => openDetail(stop.nr));
+  }
+
+  /* anchor:'bottom' hält das Popup immer über dem Marker, damit es nicht
+     unter das Sheet rutscht. */
+  popup = new mapboxgl.Popup({
+    offset:26, closeButton:true, closeOnClick:false, maxWidth:'290px',
+    focusAfterOpen:false, anchor:'bottom'
+  }).setLngLat(stop.coords).setDOMContent(wrap).addTo(map);
+}
+
+/* =========================================================================
+   Detailansicht
+   Vollbild-Overlay mit dem ausführlichen Text je Ort. Öffnet über Karte
+   oder Liste, mit Zurück-Button und Weiter/Zurück-Navigation zum
+   vorherigen bzw. nächsten Programmpunkt.
+   ========================================================================= */
+const detailEl = document.getElementById('detail');
+const detailScroll = document.getElementById('detail-scroll');
+const detailTopbar = document.querySelector('.detail__topbar');
+let detailOpen = false;
+let detailNr = null;
+
+detailScroll.addEventListener('scroll', () => {
+  detailTopbar.classList.toggle('is-scrolled', detailScroll.scrollTop > 24);
+}, { passive:true });
+
+function detailNeighbors(nr){
+  const i = STOPS.findIndex(s => s.nr === nr);
+  return { prev: i > 0 ? STOPS[i - 1] : null, next: i < STOPS.length - 1 ? STOPS[i + 1] : null };
+}
+
+function renderDetail(stop){
+  document.getElementById('detail-count').textContent = `${stop.nr} / ${STOPS.length}`;
+
+  const img = document.getElementById('detail-img');
+  img.alt = stop.name;
+  wireImage(img, stop);
+
+  document.getElementById('detail-time').textContent = `${stop.time} Uhr, ${stop.dur}`;
+  document.getElementById('detail-title').textContent = stop.name;
+  document.getElementById('detail-lead').textContent = stop.desc;
+
+  const wrap = document.getElementById('detail-sections');
+  wrap.replaceChildren();
+  stop.sections.forEach(sec => {
+    const s = document.createElement('section');
+    s.className = 'detail__section';
+    const h = document.createElement('h2');
+    h.className = 'detail__h';
+    h.textContent = sec.h;
+    const p = document.createElement('p');
+    p.className = 'detail__text';
+    p.textContent = sec.t;
+    s.append(h, p);
+    wrap.append(s);
+  });
+
+  const { prev, next } = detailNeighbors(stop.nr);
+  const prevBtn = document.getElementById('detail-prev');
+  const nextBtn = document.getElementById('detail-next');
+  prevBtn.disabled = !prev;
+  if (next){
+    nextBtn.disabled = false;
+    document.getElementById('detail-next-label').textContent = `Weiter zu ${next.name}`;
+  } else {
+    nextBtn.disabled = false;
+    document.getElementById('detail-next-label').textContent = 'Zur Übersicht';
+  }
+}
+
+function openDetail(nr){
+  const stop = STOPS.find(s => s.nr === nr);
+  if (!stop || !stop.sections || !stop.sections.length) return;
+  detailNr = nr;
+  renderDetail(stop);
+  detailScroll.scrollTop = 0;
+  detailTopbar.classList.remove('is-scrolled');
+  detailEl.classList.add('is-open');
+  detailEl.setAttribute('aria-hidden','false');
+  detailOpen = true;
+  history.pushState({ detail:nr }, '');
+}
+
+function closeDetail(fromPop){
+  if (!detailOpen) return;
+  detailOpen = false;
+  detailEl.classList.remove('is-open');
+  detailEl.setAttribute('aria-hidden','true');
+  if (!fromPop) history.back();
+}
+
+document.getElementById('detail-back').addEventListener('click', () => closeDetail(false));
+
+document.getElementById('detail-prev').addEventListener('click', () => {
+  const { prev } = detailNeighbors(detailNr);
+  if (!prev) return;
+  detailNr = prev.nr;
+  renderDetail(prev);
+  detailScroll.scrollTop = 0;
+  detailTopbar.classList.remove('is-scrolled');
+  selectStop(prev.nr, 'detail');
+});
+
+document.getElementById('detail-next').addEventListener('click', () => {
+  const { next } = detailNeighbors(detailNr);
+  if (!next){ closeDetail(false); return; }
+  detailNr = next.nr;
+  renderDetail(next);
+  detailScroll.scrollTop = 0;
+  detailTopbar.classList.remove('is-scrolled');
+  selectStop(next.nr, 'detail');
+  if (!next.sections || !next.sections.length) closeDetail(false);
+});
+
+window.addEventListener('popstate', () => { if (detailOpen) closeDetail(true); });
+
+/* Zielkarte in den sichtbaren Teil der Liste scrollen */
+function scrollCardIntoView(nr){
+  const card = cards.get(nr);
+  if (!card) return;
+  requestAnimationFrame(() => {
+    const listRect = stopsEl.getBoundingClientRect();
+    const visTop = Math.max(listRect.top, 0);
+    const visBottom = Math.min(listRect.bottom, window.innerHeight);
+    const visHeight = visBottom - visTop;
+    if (visHeight <= 0) return;
+
+    const pad = 12;
+    const slack = Math.max(visHeight - card.offsetHeight - pad * 2, 0);
+    const target = card.offsetTop - pad - Math.min(slack / 2, 40);
+    const maxScroll = stopsEl.scrollHeight - stopsEl.clientHeight;
+
+    stopsEl.scrollTo({
+      top: Math.min(Math.max(target, 0), Math.max(maxScroll, 0)),
+      behavior: REDUCED_MOTION ? 'auto' : 'smooth'
+    });
+  });
+}
+
+map.on('moveend', () => { isProgrammatic = false; });
+
+/* Sichtbarer Kartenausschnitt für fitBounds und flyTo. */
+function cameraPadding(){
+  if (DESKTOP()) return { top:110, bottom:70, left:470, right:80 };
+  const visible = visibleSheetHeight();
+  const bottom = Math.min(visible + 24, Math.round(window.innerHeight * 0.5));
+  return { top:120, bottom, left:36, right:36 };
+}
+
+/* Das Popup öffnet über dem Marker. Damit oben genug Platz bleibt, wird der
+   Marker per flyTo-offset nach unten in den sichtbaren Streifen geschoben.
+   offset ist ein Pixelversatz des Zielpunkts gegenüber der Bildmitte, positiv
+   nach unten. Mapbox rechnet das selbst um, ohne project/unproject. */
+function cameraOffset(){
+  if (DESKTOP()) return [0, 0];
+  /* Der Marker soll knapp über der Sheet-Kante liegen, das Popup öffnet
+     darüber. offset verschiebt den Zielpunkt gegenüber der Bildmitte,
+     positive Werte nach unten. */
+  const sheetTop = window.innerHeight - visibleSheetHeight();
+  const markerY = sheetTop - 24;
+  return [0, Math.round(markerY - window.innerHeight / 2)];
+}
+
+function fitRoute(animate = true){
+  const pts = STOPS.filter(s => s.coords).map(s => s.coords);
+  const bounds = pts.reduce((b, c) => b.extend(c),
+    new mapboxgl.LngLatBounds(pts[0], pts[0]));
+  map.fitBounds(bounds, {
+    padding:cameraPadding(), pitch:0, bearing:0,
+    duration:(animate && !REDUCED_MOTION) ? 1300 : 0
+  });
+}
+
+/* =========================================================================
+   Liste
+   ========================================================================= */
+const stopsEl = document.getElementById('stops');
+
+STOPS.forEach(stop => {
+  const btn = document.createElement('button');
+  btn.className = 'stop' + (stop.virtual ? ' is-virtual' : '');
+  btn.type = 'button';
+  btn.setAttribute('aria-current','false');
+
+  const img = document.createElement('img');
+  img.className = 'stop__thumb';
+  img.alt = '';
+  /* Die ersten Karten sofort laden, der Rest lazy. Sichtbare Bilder sind
+     damit auch offline sofort da, ohne den Erstaufbau zu bremsen. */
+  img.loading = stop.nr <= 4 ? 'eager' : 'lazy';
+  img.decoding = 'async';
+  wireImage(img, stop);
+
+  const body = document.createElement('div');
+  body.className = 'stop__body';
+
+  const time = document.createElement('div');
+  time.className = 'stop__time';
+  time.textContent = `${stop.time} Uhr, ${stop.dur}`;
+
+  const head = document.createElement('div');
+  head.className = 'stop__head';
+
+  const nrEl = document.createElement('span');
+  nrEl.className = 'stop__nr';
+  nrEl.textContent = stop.nr;
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 't-card-title stop__name';
+  nameEl.textContent = stop.name;
+
+  head.append(nrEl, nameEl);
+
+  const descEl = document.createElement('p');
+  descEl.className = 't-body stop__desc';
+  descEl.textContent = stop.desc;
+
+  body.append(time, head, descEl);
+
+  if (stop.sections && stop.sections.length){
+    const meta = document.createElement('div');
+    meta.className = 't-eyebrow stop__meta';
+    meta.textContent = 'Details ansehen →';
+    body.append(meta);
+  } else if (stop.virtual){
+    const meta = document.createElement('div');
+    meta.className = 't-eyebrow stop__meta';
+    meta.textContent = stop.coords ? 'Kein Programmpunkt' : 'Ohne festen Ort';
+    body.append(meta);
+  }
+
+  btn.append(img, body);
+  btn.addEventListener('click', () => {
+    selectStop(stop.nr, 'list');
+    if (stop.sections && stop.sections.length) openDetail(stop.nr);
+  });
+
+  stopsEl.append(btn);
+  cards.set(stop.nr, btn);
+});
+
+document.getElementById('sheet-meta').textContent =
+  `${STOPS.length} Programmpunkte, 08:00 bis 19:00 Uhr`;
+
+/* =========================================================================
+   Bottom Sheet
+   ========================================================================= */
+const sheet = document.getElementById('sheet');
+const grabber = document.getElementById('grabber');
+const sheetHeader = document.getElementById('sheet-header');
+
+let snap = 'peek';
+let sheetH = 0;
+let offsets = {};
+let currentY = 0;
+
+/* closed: nur die Griffleiste steht heraus, damit klar bleibt, wie man die
+   Liste wieder holt. Die Karte hat dann den ganzen Bildschirm für sich. */
+const CLOSED_VISIBLE = 30;
+
+function measure(){
+  sheetH = Math.round(window.innerHeight * 0.88);
+  sheet.style.setProperty('--sheet-h', sheetH + 'px');
+  const peekVisible = 188;
+  const halfVisible = Math.round(window.innerHeight * 0.52);
+  offsets = {
+    full:0,
+    half:sheetH - halfVisible,
+    peek:sheetH - peekVisible,
+    closed:sheetH - CLOSED_VISIBLE
+  };
+}
+
+function visibleSheetHeight(){ return sheetH - (offsets[snap] ?? 0); }
+
+function applyY(y, animate){
+  currentY = y;
+  sheet.classList.toggle('is-animating', !!animate && !REDUCED_MOTION);
+  sheet.style.transform = `translateY(${y}px)`;
+}
+
+function setSnap(next, animate = true){
+  snap = next;
+  sheet.classList.toggle('is-closed', next === 'closed');
+  applyY(offsets[next], animate);
+}
+
+function updateTourNav(){
+  const label = document.getElementById('tour-nav-label');
+  const prevBtn = document.getElementById('tour-prev');
+  const nextBtn = document.getElementById('tour-next');
+
+  prevBtn.disabled = (activeId === null || activeId <= 1);
+
+  if (activeId === null) label.textContent = 'Tour starten';
+  else {
+    const current = STOPS.find(s => s.nr === activeId);
+    label.textContent = current ? current.name : 'Tour starten';
+  }
+
+  nextBtn.disabled = activeId !== null && activeId >= STOPS.length;
+}
+
+let dragging = false, startY = 0, startTop = 0, lastY = 0, lastT = 0, velocity = 0;
+let dragMoved = 0;
+
+function canDragFrom(target){
+  if (DESKTOP()) return false;
+  if (grabber.contains(target) || sheetHeader.contains(target)) return true;
+  if (stopsEl.contains(target)) return stopsEl.scrollTop <= 0;
+  return false;
+}
+
+sheet.addEventListener('pointerdown', e => {
+  if (!canDragFrom(e.target)) return;
+  dragging = true;
+  dragMoved = 0;
+  startY = lastY = e.clientY;
+  startTop = currentY;
+  lastT = performance.now();
+  velocity = 0;
+  sheet.classList.remove('is-animating');
+  sheet.setPointerCapture(e.pointerId);
+});
+
+sheet.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  dragMoved = Math.max(dragMoved, Math.abs(e.clientY - startY));
+  let y = startTop + (e.clientY - startY);
+  const min = offsets.full, max = offsets.closed;
+  if (y < min) y = min + (y - min) * 0.32;
+  if (y > max) y = max + (y - max) * 0.32;
+
+  const now = performance.now(), dt = now - lastT;
+  if (dt > 0) velocity = (e.clientY - lastY) / dt;
+  lastY = e.clientY; lastT = now;
+
+  applyY(y, false);
+  e.preventDefault();
+}, { passive:false });
+
+function endDrag(e){
+  if (!dragging) return;
+  dragging = false;
+  try { sheet.releasePointerCapture(e.pointerId); } catch(_){}
+
+  /* Ein Tap auf die geschlossene Leiste zählt nicht als Drag, öffnet aber */
+  if (dragMoved < 6 && snap === 'closed'){
+    setSnap('peek');
+    return;
+  }
+
+  const order = ['full','half','peek','closed'];
+  if (Math.abs(velocity) > 0.5){
+    const i = order.indexOf(snap);
+    setSnap(order[velocity > 0 ? Math.min(i + 1, order.length - 1) : Math.max(i - 1, 0)]);
+    return;
+  }
+  let best = order[0], bestD = Infinity;
+  order.forEach(k => {
+    const d = Math.abs(currentY - offsets[k]);
+    if (d < bestD){ bestD = d; best = k; }
+  });
+  setSnap(best);
+}
+sheet.addEventListener('pointerup', endDrag);
+sheet.addEventListener('pointercancel', endDrag);
+
+grabber.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' '){
+    e.preventDefault();
+    const order = ['closed','peek','half','full'];
+    const i = order.indexOf(snap);
+    setSnap(order[i === -1 ? 1 : (i + 1) % order.length]);
+  }
+});
+
+/* =========================================================================
+   Steuerung
+   ========================================================================= */
+/* =========================================================================
+   Standort des Nutzers
+   Der Mapbox-GeolocateControl bringt Punkt, Genauigkeitskreis und Tracking
+   mit. Er wird versteckt eingehängt und nur über den eigenen Button im
+   Brand-Stil ausgelöst, damit die Default-Optik das Design nicht bricht.
+   ========================================================================= */
+const geolocate = new mapboxgl.GeolocateControl({
+  positionOptions:{ enableHighAccuracy:true },
+  trackUserLocation:true,
+  showUserHeading:true,
+  showAccuracyCircle:true,
+  fitBoundsOptions:{ maxZoom:16.5 }
+});
+map.addControl(geolocate);
+
+const locateBtn = document.getElementById('locate');
+
+geolocate.on('trackuserlocationstart', () => locateBtn.classList.add('is-active'));
+geolocate.on('trackuserlocationend', () => locateBtn.classList.remove('is-active'));
+geolocate.on('error', e => {
+  locateBtn.classList.remove('is-active');
+  /* code 1 = Nutzer hat abgelehnt, 2/3 = nicht ermittelbar oder Timeout */
+  toast(e && e.code === 1
+    ? 'Standort wurde abgelehnt. In den Browser-Einstellungen erlaubbar.'
+    : 'Standort konnte nicht ermittelt werden.');
+});
+
+locateBtn.addEventListener('click', () => {
+  if (!navigator.geolocation){
+    toast('Dieses Gerät unterstützt keine Standortbestimmung.');
+    return;
+  }
+  /* Standort nur außerhalb von HTTPS blockiert, localhost gilt als sicher */
+  if (!window.isSecureContext){
+    toast('Standort braucht eine HTTPS-Verbindung.');
+    return;
+  }
+  geolocate.trigger();
+});
+
+/* Kurze Rückmeldung unten, statt eines blockierenden alert() */
+let toastTimer = null;
+function toast(msg){
+  let el = document.getElementById('toast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    el.setAttribute('role','status');
+    document.body.append(el);
+  }
+  el.textContent = msg;
+  el.classList.add('is-in');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('is-in'), 4000);
+}
+
+document.getElementById('recenter').addEventListener('click', () => {
+  activeId = null;
+  if (popup){ popup.remove(); popup = null; }
+  markers.forEach(el => el.classList.remove('is-active'));
+  cards.forEach(el => { el.classList.remove('is-active'); el.setAttribute('aria-current','false'); });
+  if (!DESKTOP() && snap !== 'closed') setSnap('peek');
+  stopsEl.scrollTo({ top:0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+  isProgrammatic = true;
+  fitRoute(true);
+  updateTourNav();
+});
+
+document.getElementById('tour-prev').addEventListener('click', () => {
+  if (activeId === null || activeId <= 1) return;
+  selectStop(activeId - 1, 'nav');
+});
+
+document.getElementById('tour-next').addEventListener('click', () => {
+  const next = (activeId === null) ? 1 : activeId + 1;
+  if (next > STOPS.length) return;
+  selectStop(next, 'nav');
+});
+
+function layout(){
+  measure();
+  if (DESKTOP()){
+    sheet.style.transform = '';
+  } else {
+    applyY(offsets[snap], false);
+  }
+  updateTourNav();
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 120));
+
+measure();
+setSnap('peek', false);
+
+/* =========================================================================
+   Service Worker
+   Braucht HTTPS oder localhost. Beim Öffnen per Doppelklick (file://) wird
+   die Registrierung übersprungen, die App läuft dann einfach ohne Offline.
+   ========================================================================= */
+if ('serviceWorker' in navigator && window.isSecureContext){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => {
+        /* Auf dem Server nach einer neueren Version schauen */
+        reg.update().catch(() => {});
+        prefetchImages();
+      })
+      .catch(() => {
+        /* Offline-Betrieb ist ein Extra, ein Fehler darf die App nicht stören */
+      });
+
+    /* Übernimmt ein neuer Service Worker, einmal neu laden, damit alle
+       sofort die aktuelle Version sehen statt erst beim übernächsten Start. */
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  });
+}
+
+/* Die Listenbilder hängen an loading="lazy" und würden sonst erst beim
+   Scrollen geladen. Für den Offline-Fall werden sie im Hintergrund
+   vorgeholt, nacheinander, damit der Seitenaufbau nicht ausgebremst wird. */
+async function prefetchImages(){
+  await new Promise(r => setTimeout(r, 2500));
+  for (const stop of STOPS){
+    if (!stop.img) continue;
+    try {
+      await fetch(stop.img, { mode:'no-cors', cache:'force-cache' });
+      await new Promise(r => setTimeout(r, 120));
+    } catch (_) { /* einzelnes Bild darf fehlschlagen */ }
+  }
+}
+
+/* Für Debugging in der Konsole */
+window.__map = map;
+window.__selectStop = selectStop;
+window.__setSnap = setSnap;
+window.__getSnap = () => snap;
+map.on('idle', () => { window.__mapIdle = true; });
+</script>
+</body>
+</html>
