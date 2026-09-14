@@ -13,7 +13,7 @@
 
 /* Bei jeder inhaltlichen Änderung hochzählen. Alte Caches werden dadurch
    beim Aktivieren gelöscht und die Nutzer bekommen die neue Version. */
-const VERSION = 'v8';
+const VERSION = 'v9';
 const APP_CACHE = `chicago-app-${VERSION}`;
 const RUNTIME_CACHE = `chicago-runtime-${VERSION}`;
 
